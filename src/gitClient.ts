@@ -13,6 +13,10 @@ async function runGitCommand(args: string[]): Promise<string> {
   return stdout.trim();
 }
 
+export async function getCurrentBranch(): Promise<string> {
+  return runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"]);
+}
+
 export async function ensureImplementationBranch(
   branchName: string,
 ): Promise<ImplementationBranchResult> {

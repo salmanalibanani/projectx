@@ -66,6 +66,14 @@ export type ImplementationBranchResult = {
   error?: string;
 };
 
+export type AppScaffoldResult = {
+  generated: boolean;
+  appPath: string;
+  files: string[];
+  error?: string;
+  conflicts?: string[];
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -89,5 +97,6 @@ export type OrchestratorResult = {
   githubIssue: GitHubIssueResult;
   implementationPreparation?: ImplementationPreparationResult;
   implementationBranch?: ImplementationBranchResult;
+  appScaffold?: AppScaffoldResult;
   nextRecommendedAction: string;
 };

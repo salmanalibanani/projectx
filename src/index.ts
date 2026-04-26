@@ -1,5 +1,6 @@
+import { generateAppScaffold } from "./appScaffold.js";
 import { createGitHubIssue } from "./githubClient.js";
-import { ensureImplementationBranch } from "./gitClient.js";
+import { ensureImplementationBranch, getCurrentBranch } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
@@ -12,12 +13,14 @@ async function main() {
   const shouldCreateImplementationBranch = args.includes(
     "--create-implementation-branch",
   );
+  const shouldGenerateAppScaffold = args.includes("--generate-app-scaffold");
   const userRequest = args
     .filter(
       (arg) =>
         arg !== "--create-github-issue" &&
         arg !== "--prepare-implementation" &&
-        arg !== "--create-implementation-branch",
+        arg !== "--create-implementation-branch" &&
+        arg !== "--generate-app-scaffold",
     )
     .join(" ");
 
@@ -136,6 +139,51 @@ async function main() {
       } else {
         result.implementationBranch =
           await ensureImplementationBranch(branchName);
+      }
+    }
+  }
+
+  if (shouldGenerateAppScaffold) {
+    const implementationPlanFilePath = result.generatedFiles.find((filePath) =>
+      filePath.endsWith(".implementation-plan.md"),
+    );
+    const requiredBranchName = `feature/${result.workItemId}`;
+
+    if (!implementationPlanFilePath) {
+      result.appScaffold = {
+        generated: false,
+        appPath: "apps/theskeleton",
+        files: [],
+        error: "Implementation plan file path is missing from generatedFiles.",
+      };
+    } else {
+      const implementationPlanStatus = await readImplementationPlanStatus(
+        implementationPlanFilePath,
+      );
+
+      result.implementationPlan.status = implementationPlanStatus;
+
+      if (implementationPlanStatus !== "approved") {
+        result.appScaffold = {
+          generated: false,
+          appPath: "apps/theskeleton",
+          files: [],
+          error:
+            "Implementation plan must be approved before generating app scaffold.",
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.appScaffold = {
+            generated: false,
+            appPath: "apps/theskeleton",
+            files: [],
+            error: `App scaffold can only be generated on branch ${requiredBranchName}.`,
+          };
+        } else {
+          result.appScaffold = await generateAppScaffold();
+        }
       }
     }
   }
