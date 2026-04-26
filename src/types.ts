@@ -22,6 +22,19 @@ export type IssueDraft = {
   labels: string[];
 };
 
+export type RequirementsSection = {
+  title: string;
+  content: string[];
+};
+
+export type RequirementsDraft = {
+  title: string;
+  sourceRequest: string;
+  targetAppName: string;
+  status: "draft";
+  sections: RequirementsSection[];
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   url?: string;
@@ -36,6 +49,7 @@ export type OrchestratorResult = {
   goal: string;
   phases: Phase[];
   approvalGates: ApprovalGate[];
+  requirementsDraft: RequirementsDraft;
   issueDraft: IssueDraft;
   generatedFiles: string[];
   githubIssue: GitHubIssueResult;
