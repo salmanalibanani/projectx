@@ -39,6 +39,7 @@ export type RequirementsDraft = {
 
 export type GitHubIssueResult = {
   created: boolean;
+  existing?: boolean;
   url?: string;
   number?: number;
   error?: string;

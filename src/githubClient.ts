@@ -9,7 +9,61 @@ type GitHubConfig = {
 type GitHubIssueApiResponse = {
   html_url?: string;
   number?: number;
+  title?: string;
 };
+
+function getGitHubHeaders(config: GitHubConfig): HeadersInit {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${config.token}`,
+    "Content-Type": "application/json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+}
+
+async function findExistingOpenIssue(
+  config: GitHubConfig,
+  issueTitle: string,
+): Promise<GitHubIssueResult | null> {
+  const response = await fetch(
+    `https://api.github.com/repos/${config.owner}/${config.repo}/issues?state=open&per_page=100`,
+    {
+      method: "GET",
+      headers: getGitHubHeaders(config),
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+
+    return {
+      created: false,
+      error: `GitHub issue lookup failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
+    };
+  }
+
+  const issues = (await response.json()) as GitHubIssueApiResponse[];
+  const existingIssue = issues.find((issue) => issue.title === issueTitle);
+
+  if (!existingIssue) {
+    return null;
+  }
+
+  const result: GitHubIssueResult = {
+    created: false,
+    existing: true,
+  };
+
+  if (existingIssue.html_url !== undefined) {
+    result.url = existingIssue.html_url;
+  }
+
+  if (existingIssue.number !== undefined) {
+    result.number = existingIssue.number;
+  }
+
+  return result;
+}
 
 function getMissingGitHubEnvVars(env: NodeJS.ProcessEnv): string[] {
   const requiredVars = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"] as const;
@@ -45,16 +99,24 @@ export async function createGitHubIssue(
   }
 
   try {
+    const existingIssueResult = await findExistingOpenIssue(
+      config,
+      issueDraft.title,
+    );
+
+    if (existingIssueResult?.error) {
+      return existingIssueResult;
+    }
+
+    if (existingIssueResult) {
+      return existingIssueResult;
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${config.owner}/${config.repo}/issues`,
       {
         method: "POST",
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${config.token}`,
-          "Content-Type": "application/json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
+        headers: getGitHubHeaders(config),
         body: JSON.stringify({
           title: issueDraft.title,
           body: issueDraft.body,
@@ -76,6 +138,7 @@ export async function createGitHubIssue(
 
     const result: GitHubIssueResult = {
       created: true,
+      existing: false,
     };
 
     if (data.html_url !== undefined) {
