@@ -2,7 +2,7 @@
 
 Work item ID: theskeleton-google-login
 
-Status: draft
+Status: approved
 
 Source requirements file: output/requirements/theskeleton-google-login.requirements.md
 

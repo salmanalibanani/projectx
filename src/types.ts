@@ -29,6 +29,7 @@ export type RequirementsSection = {
 };
 
 export type RequirementsStatus = "draft" | "approved";
+export type ImplementationPlanStatus = "draft" | "approved";
 
 export type RequirementsDraft = {
   workItemId: string;
@@ -43,9 +44,18 @@ export type ImplementationPlan = {
   workItemId: string;
   title: string;
   sourceRequirementsFile: string;
-  status: "draft";
+  status: ImplementationPlanStatus;
   targetAppName: string;
   sections: RequirementsSection[];
+};
+
+export type ImplementationPreparationResult = {
+  ready: boolean;
+  reason: string;
+  planFile: string;
+  requiredStatus: "approved";
+  actualStatus: ImplementationPlanStatus;
+  proposedBranchName?: string;
 };
 
 export type GitHubIssueResult = {
@@ -69,5 +79,6 @@ export type OrchestratorResult = {
   issueDraft: IssueDraft;
   generatedFiles: string[];
   githubIssue: GitHubIssueResult;
+  implementationPreparation?: ImplementationPreparationResult;
   nextRecommendedAction: string;
 };

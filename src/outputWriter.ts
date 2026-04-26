@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
 import type { OrchestratorResult } from "./types.js";
 
@@ -95,6 +96,7 @@ export async function writeOrchestratorOutput(
 
     if (filePath.endsWith(".implementation-plan.md")) {
       let sourceRequirementsStatus = result.requirementsDraft.status;
+      let implementationPlanStatus = result.implementationPlan.status;
 
       if (requirementsFilePath) {
         try {
@@ -105,8 +107,20 @@ export async function writeOrchestratorOutput(
         }
       }
 
+      try {
+        implementationPlanStatus = await readImplementationPlanStatus(filePath);
+      } catch {
+        implementationPlanStatus = result.implementationPlan.status;
+      }
+
       fileContents = renderImplementationPlanMarkdown(
-        result,
+        {
+          ...result,
+          implementationPlan: {
+            ...result.implementationPlan,
+            status: implementationPlanStatus,
+          },
+        },
         sourceRequirementsStatus,
       );
     }
