@@ -1,4 +1,5 @@
 import { createGitHubIssue } from "./githubClient.js";
+import { ensureImplementationBranch } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
@@ -8,10 +9,15 @@ async function main() {
   const args = process.argv.slice(2);
   const shouldCreateGitHubIssue = args.includes("--create-github-issue");
   const shouldPrepareImplementation = args.includes("--prepare-implementation");
+  const shouldCreateImplementationBranch = args.includes(
+    "--create-implementation-branch",
+  );
   const userRequest = args
     .filter(
       (arg) =>
-        arg !== "--create-github-issue" && arg !== "--prepare-implementation",
+        arg !== "--create-github-issue" &&
+        arg !== "--prepare-implementation" &&
+        arg !== "--create-implementation-branch",
     )
     .join(" ");
 
@@ -93,6 +99,43 @@ async function main() {
           actualStatus: implementationPlanStatus,
           proposedBranchName: `feature/${result.workItemId}`,
         };
+      }
+    }
+  }
+
+  if (shouldCreateImplementationBranch) {
+    const implementationPlanFilePath = result.generatedFiles.find((filePath) =>
+      filePath.endsWith(".implementation-plan.md"),
+    );
+    const branchName = `feature/${result.workItemId}`;
+
+    if (!implementationPlanFilePath) {
+      result.implementationBranch = {
+        branchName,
+        created: false,
+        existing: false,
+        switched: false,
+        error: "Implementation plan file path is missing from generatedFiles.",
+      };
+    } else {
+      const implementationPlanStatus = await readImplementationPlanStatus(
+        implementationPlanFilePath,
+      );
+
+      result.implementationPlan.status = implementationPlanStatus;
+
+      if (implementationPlanStatus !== "approved") {
+        result.implementationBranch = {
+          branchName,
+          created: false,
+          existing: false,
+          switched: false,
+          error:
+            "Implementation plan must be approved before creating implementation branch.",
+        };
+      } else {
+        result.implementationBranch =
+          await ensureImplementationBranch(branchName);
       }
     }
   }

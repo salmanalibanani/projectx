@@ -58,6 +58,14 @@ export type ImplementationPreparationResult = {
   proposedBranchName?: string;
 };
 
+export type ImplementationBranchResult = {
+  branchName: string;
+  created: boolean;
+  existing: boolean;
+  switched: boolean;
+  error?: string;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -80,5 +88,6 @@ export type OrchestratorResult = {
   generatedFiles: string[];
   githubIssue: GitHubIssueResult;
   implementationPreparation?: ImplementationPreparationResult;
+  implementationBranch?: ImplementationBranchResult;
   nextRecommendedAction: string;
 };
