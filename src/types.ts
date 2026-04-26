@@ -16,6 +16,12 @@ export type ApprovalGate = {
   reason: string;
 };
 
+export type IssueDraft = {
+  title: string;
+  body: string;
+  labels: string[];
+};
+
 export type OrchestratorResult = {
   systemName: string;
   targetAppName: string;
@@ -23,5 +29,6 @@ export type OrchestratorResult = {
   goal: string;
   phases: Phase[];
   approvalGates: ApprovalGate[];
+  issueDraft: IssueDraft;
   nextRecommendedAction: string;
 };

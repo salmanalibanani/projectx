@@ -1,4 +1,10 @@
-import type { ApprovalGate, OrchestratorResult, Phase, Task } from "./types.js";
+import type {
+  ApprovalGate,
+  IssueDraft,
+  OrchestratorResult,
+  Phase,
+  Task,
+} from "./types.js";
 
 const phases: Phase[] = [
   {
@@ -75,6 +81,41 @@ const approvalGates: ApprovalGate[] = [
   },
 ];
 
+const issueDraft: IssueDraft = {
+  title: "Build TheSkeleton Google login authentication",
+  labels: ["app:theskeleton", "type:feature", "status:planned"],
+  body: [
+    "## Background",
+    "ProjectX should produce a deterministic plan for building TheSkeleton with Google login authentication without calling external APIs.",
+    "",
+    "## Goal",
+    "Plan the creation of TheSkeleton Google login authentication in a way that is simple, reviewable, and deterministic.",
+    "",
+    "## Scope",
+    "- Define the work needed to add Google login authentication to TheSkeleton.",
+    "- Describe the expected deliverables and checkpoints before implementation and release preparation.",
+    "- Capture human approval gates before risky repository, deployment, or communication actions.",
+    "",
+    "## Out of scope",
+    "- Calling the GitHub API.",
+    "- Calling the OpenAI API.",
+    "- Implementing the authentication flow.",
+    "- Deploying any environment.",
+    "",
+    "## Acceptance criteria",
+    "- ProjectX returns a deterministic issue draft for this request.",
+    '- The issue draft title is "Build TheSkeleton Google login authentication".',
+    '- The issue draft labels include "app:theskeleton", "type:feature", and "status:planned".',
+    "- The issue draft body includes Background, Goal, Scope, Out of scope, Acceptance criteria, and Approval gates.",
+    "- The orchestrator output remains free of GitHub API and OpenAI API calls.",
+    "",
+    "## Approval gates",
+    ...approvalGates.map(
+      (gate) => `- ${gate.id}: ${gate.description} Reason: ${gate.reason}`,
+    ),
+  ].join("\n"),
+};
+
 export async function runOrchestrator(
   request: string,
 ): Promise<OrchestratorResult> {
@@ -85,6 +126,7 @@ export async function runOrchestrator(
     goal: "Plan the creation of TheSkeleton, a React app with Google login authentication, while keeping ProjectX simple and deterministic.",
     phases,
     approvalGates,
+    issueDraft,
     nextRecommendedAction:
       "Review the plan and confirm the first safe task: clarify requirements and draft the initial GitHub issue.",
   };
