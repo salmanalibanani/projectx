@@ -1,5 +1,7 @@
 # TheSkeleton Google login requirements draft
 
+Work item ID: theskeleton-google-login
+
 Status: approved
 
 Source request: Build TheSkeleton app with Google login

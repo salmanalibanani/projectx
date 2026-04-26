@@ -1,6 +1,14 @@
 # Build TheSkeleton Google login authentication
 
+Work item ID: theskeleton-google-login
+
 Labels: app:theskeleton, type:feature, status:planned
+
+<!-- projectx
+workItemId: theskeleton-google-login
+targetApp: TheSkeleton
+artifactType: implementation-issue
+-->
 
 ## Background
 ProjectX is the automation system, and TheSkeleton is the first app it will eventually build.

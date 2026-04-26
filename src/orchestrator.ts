@@ -7,6 +7,8 @@ import type {
   Task,
 } from "./types.js";
 
+const workItemId = "theskeleton-google-login";
+
 const phases: Phase[] = [
   {
     id: "understanding",
@@ -83,9 +85,16 @@ const approvalGates: ApprovalGate[] = [
 ];
 
 const issueDraft: IssueDraft = {
+  workItemId,
   title: "Build TheSkeleton Google login authentication",
   labels: ["app:theskeleton", "type:feature", "status:planned"],
   body: [
+    "<!-- projectx",
+    `workItemId: ${workItemId}`,
+    "targetApp: TheSkeleton",
+    "artifactType: implementation-issue",
+    "-->",
+    "",
     "## Background",
     "ProjectX is the automation system, and TheSkeleton is the first app it will eventually build.",
     "This milestone only drafts a deterministic GitHub issue for Google login authentication work without calling external APIs.",
@@ -125,6 +134,7 @@ export async function runOrchestrator(
   request: string,
 ): Promise<OrchestratorResult> {
   const requirementsDraft: RequirementsDraft = {
+    workItemId,
     title: "TheSkeleton Google login requirements draft",
     sourceRequest: request,
     targetAppName: "TheSkeleton",
@@ -198,6 +208,7 @@ export async function runOrchestrator(
   };
 
   return {
+    workItemId,
     request,
     systemName: "ProjectX",
     targetAppName: "TheSkeleton",

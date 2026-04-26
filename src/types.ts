@@ -17,6 +17,7 @@ export type ApprovalGate = {
 };
 
 export type IssueDraft = {
+  workItemId: string;
   title: string;
   body: string;
   labels: string[];
@@ -30,6 +31,7 @@ export type RequirementsSection = {
 export type RequirementsStatus = "draft" | "approved";
 
 export type RequirementsDraft = {
+  workItemId: string;
   title: string;
   sourceRequest: string;
   targetAppName: string;
@@ -46,6 +48,7 @@ export type GitHubIssueResult = {
 };
 
 export type OrchestratorResult = {
+  workItemId: string;
   systemName: string;
   targetAppName: string;
   request: string;

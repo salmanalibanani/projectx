@@ -14,6 +14,8 @@ function renderRequirementsMarkdown(result: OrchestratorResult): string {
   return [
     `# ${result.requirementsDraft.title}`,
     "",
+    `Work item ID: ${result.requirementsDraft.workItemId}`,
+    "",
     `Status: ${result.requirementsDraft.status}`,
     "",
     `Source request: ${result.requirementsDraft.sourceRequest}`,
@@ -29,6 +31,8 @@ function renderIssueMarkdown(result: OrchestratorResult): string {
 
   return [
     `# ${result.issueDraft.title}`,
+    "",
+    `Work item ID: ${result.issueDraft.workItemId}`,
     "",
     labelsLine,
     "",

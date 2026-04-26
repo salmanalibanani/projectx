@@ -7,6 +7,7 @@ type GitHubConfig = {
 };
 
 type GitHubIssueApiResponse = {
+  body?: string;
   html_url?: string;
   number?: number;
   title?: string;
@@ -21,8 +22,24 @@ function getGitHubHeaders(config: GitHubConfig): HeadersInit {
   };
 }
 
+function hasMatchingProjectXMetadata(
+  issueBody: string | undefined,
+  workItemId: string,
+): boolean {
+  if (!issueBody) {
+    return false;
+  }
+
+  const metadataPattern = new RegExp(
+    `<!--\\s*projectx[\\s\\S]*?workItemId:\\s*${workItemId}[\\s\\S]*?-->`,
+  );
+
+  return metadataPattern.test(issueBody);
+}
+
 async function findExistingOpenIssue(
   config: GitHubConfig,
+  workItemId: string,
   issueTitle: string,
 ): Promise<GitHubIssueResult | null> {
   const response = await fetch(
@@ -43,7 +60,11 @@ async function findExistingOpenIssue(
   }
 
   const issues = (await response.json()) as GitHubIssueApiResponse[];
-  const existingIssue = issues.find((issue) => issue.title === issueTitle);
+  const existingIssueByMetadata = issues.find((issue) =>
+    hasMatchingProjectXMetadata(issue.body, workItemId),
+  );
+  const existingIssue =
+    existingIssueByMetadata ?? issues.find((issue) => issue.title === issueTitle);
 
   if (!existingIssue) {
     return null;
@@ -101,6 +122,7 @@ export async function createGitHubIssue(
   try {
     const existingIssueResult = await findExistingOpenIssue(
       config,
+      issueDraft.workItemId,
       issueDraft.title,
     );
 
