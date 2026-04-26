@@ -1,6 +1,6 @@
 # TheSkeleton Google login requirements draft
 
-Status: draft
+Status: approved
 
 Source request: Build TheSkeleton app with Google login
 

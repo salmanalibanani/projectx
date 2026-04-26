@@ -27,11 +27,13 @@ export type RequirementsSection = {
   content: string[];
 };
 
+export type RequirementsStatus = "draft" | "approved";
+
 export type RequirementsDraft = {
   title: string;
   sourceRequest: string;
   targetAppName: string;
-  status: "draft";
+  status: RequirementsStatus;
   sections: RequirementsSection[];
 };
 

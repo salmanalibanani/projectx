@@ -1,6 +1,7 @@
 import { createGitHubIssue } from "./githubClient.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
+import { readRequirementsStatus } from "./requirementsApproval.js";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -21,7 +22,31 @@ async function main() {
   await writeOrchestratorOutput(result);
 
   if (shouldCreateGitHubIssue) {
-    result.githubIssue = await createGitHubIssue(result.issueDraft);
+    const requirementsFilePath = result.generatedFiles.find((filePath) =>
+      filePath.endsWith(".requirements.md"),
+    );
+
+    if (!requirementsFilePath) {
+      result.githubIssue = {
+        created: false,
+        error: "Requirements file path is missing from generatedFiles.",
+      };
+    } else {
+      const requirementsStatus = await readRequirementsStatus(
+        requirementsFilePath,
+      );
+
+      result.requirementsDraft.status = requirementsStatus;
+
+      if (requirementsStatus !== "approved") {
+        result.githubIssue = {
+          created: false,
+          error: `Requirements must be approved before creating a GitHub issue. Review: ${requirementsFilePath}`,
+        };
+      } else {
+        result.githubIssue = await createGitHubIssue(result.issueDraft);
+      }
+    }
   }
 
   console.log(JSON.stringify(result, null, 2));

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import { readRequirementsStatus } from "./requirementsApproval.js";
 import type { OrchestratorResult } from "./types.js";
 
 function renderRequirementsMarkdown(result: OrchestratorResult): string {
@@ -40,9 +41,22 @@ export async function writeOrchestratorOutput(
   result: OrchestratorResult,
 ): Promise<void> {
   for (const filePath of result.generatedFiles) {
-    const fileContents = filePath.endsWith(".requirements.md")
-      ? renderRequirementsMarkdown(result)
-      : renderIssueMarkdown(result);
+    let fileContents = renderIssueMarkdown(result);
+
+    if (filePath.endsWith(".requirements.md")) {
+      const requirementsDraft = { ...result.requirementsDraft };
+
+      try {
+        requirementsDraft.status = await readRequirementsStatus(filePath);
+      } catch {
+        requirementsDraft.status = result.requirementsDraft.status;
+      }
+
+      fileContents = renderRequirementsMarkdown({
+        ...result,
+        requirementsDraft,
+      });
+    }
 
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, fileContents, "utf8");
