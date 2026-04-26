@@ -132,6 +132,9 @@ export async function runOrchestrator(
     approvalGates,
     issueDraft,
     generatedFiles: ["output/issues/theskeleton-google-login.md"],
+    githubIssue: {
+      created: false,
+    },
     nextRecommendedAction:
       "Review the plan and confirm the first safe task: clarify requirements and draft the initial GitHub issue.",
   };

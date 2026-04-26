@@ -22,6 +22,13 @@ export type IssueDraft = {
   labels: string[];
 };
 
+export type GitHubIssueResult = {
+  created: boolean;
+  url?: string;
+  number?: number;
+  error?: string;
+};
+
 export type OrchestratorResult = {
   systemName: string;
   targetAppName: string;
@@ -31,5 +38,6 @@ export type OrchestratorResult = {
   approvalGates: ApprovalGate[];
   issueDraft: IssueDraft;
   generatedFiles: string[];
+  githubIssue: GitHubIssueResult;
   nextRecommendedAction: string;
 };
