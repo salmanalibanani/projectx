@@ -1,4 +1,4 @@
-import { runOrchestrator } from "./orchestrator";
+import { runOrchestrator } from "./orchestrator.js";
 
 async function main() {
   const userRequest = process.argv.slice(2).join(" ");
