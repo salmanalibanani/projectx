@@ -30,5 +30,6 @@ export type OrchestratorResult = {
   phases: Phase[];
   approvalGates: ApprovalGate[];
   issueDraft: IssueDraft;
+  generatedFiles: string[];
   nextRecommendedAction: string;
 };

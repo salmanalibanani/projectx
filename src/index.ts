@@ -1,4 +1,5 @@
 import { runOrchestrator } from "./orchestrator.js";
+import { writeOrchestratorOutput } from "./outputWriter.js";
 
 async function main() {
   const userRequest = process.argv.slice(2).join(" ");
@@ -12,6 +13,7 @@ async function main() {
   }
 
   const result = await runOrchestrator(userRequest);
+  await writeOrchestratorOutput(result);
 
   console.log(JSON.stringify(result, null, 2));
 }
