@@ -1,5 +1,6 @@
 import type {
   ApprovalGate,
+  ImplementationPlan,
   IssueDraft,
   OrchestratorResult,
   Phase,
@@ -8,6 +9,11 @@ import type {
 } from "./types.js";
 
 const workItemId = "theskeleton-google-login";
+const requirementsFilePath =
+  "output/requirements/theskeleton-google-login.requirements.md";
+const implementationPlanFilePath =
+  "output/plans/theskeleton-google-login.implementation-plan.md";
+const issueFilePath = "output/issues/theskeleton-google-login.md";
 
 const phases: Phase[] = [
   {
@@ -207,6 +213,76 @@ export async function runOrchestrator(
     ],
   };
 
+  const implementationPlan: ImplementationPlan = {
+    workItemId,
+    title: "TheSkeleton Google login implementation plan",
+    sourceRequirementsFile: requirementsFilePath,
+    status: "draft",
+    targetAppName: "TheSkeleton",
+    sections: [
+      {
+        title: "Summary",
+        content: [
+          "This plan translates the deterministic TheSkeleton requirements draft into an implementation approach that can be reviewed before any branch or app creation begins.",
+        ],
+      },
+      {
+        title: "Proposed technical approach",
+        content: [
+          "Create TheSkeleton as a simple React application with a minimal, reviewable folder structure.",
+          "Add a placeholder configuration boundary for Google authentication without wiring real secrets in this milestone.",
+          "Implement a basic login/logout UI flow with a visible authenticated state area.",
+          "Keep the implementation steps deterministic and aligned with the approved requirements before any repository automation proceeds.",
+        ],
+      },
+      {
+        title: "Files and folders likely to be created",
+        content: [
+          "- Application root files for a React project scaffold.",
+          "- Source folders for UI components, authentication helpers, and app state.",
+          "- Configuration placeholders for Google authentication setup.",
+          "- Build and test configuration files if they are needed by the chosen scaffold.",
+        ],
+      },
+      {
+        title: "Implementation phases",
+        content: [
+          "- Create TheSkeleton React app structure",
+          "- Add Google authentication configuration placeholder",
+          "- Add login/logout UI flow",
+          "- Add authenticated state display",
+          "- Add basic build/test verification",
+        ],
+      },
+      {
+        title: "Validation plan",
+        content: [
+          "- Install dependencies",
+          "- Run build",
+          "- Run tests if configured",
+          "- Manual login/logout smoke test later",
+        ],
+      },
+      {
+        title: "Risks and assumptions",
+        content: [
+          "The final React scaffold choice is still an implementation detail and should remain simple.",
+          "Google authentication setup will require environment-specific configuration later.",
+          "Manual verification of the live login flow is deferred until implementation exists.",
+        ],
+      },
+      {
+        title: "Approval checklist",
+        content: [
+          "- [ ] Implementation plan reviewed by human",
+          "- [ ] Technical approach confirmed",
+          "- [ ] Validation plan confirmed",
+          "- [ ] Approval given to create implementation branch",
+        ],
+      },
+    ],
+  };
+
   return {
     workItemId,
     request,
@@ -216,10 +292,12 @@ export async function runOrchestrator(
     phases,
     approvalGates,
     requirementsDraft,
+    implementationPlan,
     issueDraft,
     generatedFiles: [
-      "output/requirements/theskeleton-google-login.requirements.md",
-      "output/issues/theskeleton-google-login.md",
+      requirementsFilePath,
+      implementationPlanFilePath,
+      issueFilePath,
     ],
     githubIssue: {
       created: false,

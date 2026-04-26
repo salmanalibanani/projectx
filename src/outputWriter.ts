@@ -41,9 +41,40 @@ function renderIssueMarkdown(result: OrchestratorResult): string {
   ].join("\n");
 }
 
+function renderImplementationPlanMarkdown(
+  result: OrchestratorResult,
+  sourceRequirementsStatus: string,
+): string {
+  const sectionLines = result.implementationPlan.sections.flatMap((section) => [
+    `## ${section.title}`,
+    ...section.content,
+    "",
+  ]);
+
+  return [
+    `# ${result.implementationPlan.title}`,
+    "",
+    `Work item ID: ${result.implementationPlan.workItemId}`,
+    "",
+    `Status: ${result.implementationPlan.status}`,
+    "",
+    `Source requirements file: ${result.implementationPlan.sourceRequirementsFile}`,
+    "",
+    `Source requirements status: ${sourceRequirementsStatus}`,
+    "",
+    `Target app: ${result.implementationPlan.targetAppName}`,
+    "",
+    ...sectionLines,
+  ].join("\n");
+}
+
 export async function writeOrchestratorOutput(
   result: OrchestratorResult,
 ): Promise<void> {
+  const requirementsFilePath = result.generatedFiles.find((filePath) =>
+    filePath.endsWith(".requirements.md"),
+  );
+
   for (const filePath of result.generatedFiles) {
     let fileContents = renderIssueMarkdown(result);
 
@@ -60,6 +91,24 @@ export async function writeOrchestratorOutput(
         ...result,
         requirementsDraft,
       });
+    }
+
+    if (filePath.endsWith(".implementation-plan.md")) {
+      let sourceRequirementsStatus = result.requirementsDraft.status;
+
+      if (requirementsFilePath) {
+        try {
+          sourceRequirementsStatus =
+            await readRequirementsStatus(requirementsFilePath);
+        } catch {
+          sourceRequirementsStatus = result.requirementsDraft.status;
+        }
+      }
+
+      fileContents = renderImplementationPlanMarkdown(
+        result,
+        sourceRequirementsStatus,
+      );
     }
 
     await mkdir(dirname(filePath), { recursive: true });

@@ -39,6 +39,15 @@ export type RequirementsDraft = {
   sections: RequirementsSection[];
 };
 
+export type ImplementationPlan = {
+  workItemId: string;
+  title: string;
+  sourceRequirementsFile: string;
+  status: "draft";
+  targetAppName: string;
+  sections: RequirementsSection[];
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -56,6 +65,7 @@ export type OrchestratorResult = {
   phases: Phase[];
   approvalGates: ApprovalGate[];
   requirementsDraft: RequirementsDraft;
+  implementationPlan: ImplementationPlan;
   issueDraft: IssueDraft;
   generatedFiles: string[];
   githubIssue: GitHubIssueResult;
