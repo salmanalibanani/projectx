@@ -13,6 +13,13 @@ import {
 } from "./projectxConfig.js";
 import type { CodeGenerationResult } from "./types.js";
 
+const RAW_TEXT_LOG_LIMIT = 4000;
+const promptAllowedFiles = [
+  "apps/theskeleton/src/App.tsx",
+  "apps/theskeleton/src/main.tsx",
+  "apps/theskeleton/src/auth/googleAuthPlaceholder.ts",
+] as const;
+
 type ProposedFileUpdate = {
   path: string;
   content: string;
@@ -26,6 +33,32 @@ type CodeGenerationContext = {
   requirements: string;
   implementationPlan: string;
   files: Record<string, string>;
+};
+
+type ResponseContentItem = {
+  type?: string;
+  text?: string;
+  [key: string]: unknown;
+};
+
+type ResponseOutputItem = {
+  type?: string;
+  status?: string;
+  content?: ResponseContentItem[];
+  [key: string]: unknown;
+};
+
+type ResponseDiagnostics = {
+  responseId?: string;
+  responseStatus?: string;
+  finishReason?: string;
+  outputItemTypes: string[];
+  outputStatuses: string[];
+};
+
+type ExtractedResponseText = {
+  text: string | null;
+  diagnostics: ResponseDiagnostics;
 };
 
 function isAllowedCodeGenerationPath(filePath: string): boolean {
@@ -52,49 +85,229 @@ async function readFileIfPresent(filePath: string): Promise<string | null> {
   }
 }
 
-function extractResponseText(payload: unknown): string | null {
+function truncateText(text: string, maxLength = RAW_TEXT_LOG_LIMIT): string {
+  return text.length > maxLength ? `${text.slice(0, maxLength)}\n...[truncated]` : text;
+}
+
+function extractTextFromContentItems(content: unknown): string {
+  if (!Array.isArray(content)) {
+    return "";
+  }
+
+  return content
+    .flatMap((item) => {
+      if (!item || typeof item !== "object") {
+        return [];
+      }
+
+      const contentItem = item as ResponseContentItem;
+
+      if (
+        contentItem.type === "output_text" &&
+        typeof contentItem.text === "string" &&
+        contentItem.text.trim()
+      ) {
+        return [contentItem.text];
+      }
+
+      if (typeof contentItem.text === "string" && contentItem.text.trim()) {
+        return [contentItem.text];
+      }
+
+      return [];
+    })
+    .join("")
+    .trim();
+}
+
+export function extractResponseText(payload: unknown): ExtractedResponseText {
+  const diagnostics: ResponseDiagnostics = {
+    outputItemTypes: [],
+    outputStatuses: [],
+  };
+
   if (!payload || typeof payload !== "object") {
-    return null;
+    return { text: null, diagnostics };
   }
 
   const response = payload as {
+    id?: string;
+    status?: string;
     output_text?: string;
+    output?: ResponseOutputItem[];
     choices?: Array<{
+      finish_reason?: string;
       message?: {
-        content?:
-          | string
-          | Array<{
-              type?: string;
-              text?: string;
-            }>;
+        content?: string | ResponseContentItem[];
       };
     }>;
   };
 
-  if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return response.output_text;
+  if (typeof response.id === "string") {
+    diagnostics.responseId = response.id;
   }
 
-  const firstChoice = response.choices?.[0]?.message?.content;
-
-  if (typeof firstChoice === "string" && firstChoice.trim()) {
-    return firstChoice;
+  if (typeof response.status === "string") {
+    diagnostics.responseStatus = response.status;
   }
 
-  if (Array.isArray(firstChoice)) {
-    const textValue = firstChoice
-      .map((item) => item?.text ?? "")
+  if (
+    typeof response.output_text === "string" &&
+    response.output_text.trim().length > 0
+  ) {
+    return {
+      text: response.output_text.trim(),
+      diagnostics,
+    };
+  }
+
+  if (Array.isArray(response.output)) {
+    diagnostics.outputItemTypes = response.output
+      .map((item) => item?.type)
+      .filter((value): value is string => typeof value === "string");
+    diagnostics.outputStatuses = response.output
+      .map((item) => item?.status)
+      .filter((value): value is string => typeof value === "string");
+
+    const outputText = response.output
+      .map((item) => extractTextFromContentItems(item?.content))
       .join("")
       .trim();
 
-    return textValue || null;
+    if (outputText) {
+      return {
+        text: outputText,
+        diagnostics,
+      };
+    }
+  }
+
+  const firstChoice = response.choices?.[0];
+
+  if (typeof firstChoice?.finish_reason === "string") {
+    diagnostics.finishReason = firstChoice.finish_reason;
+  }
+
+  const choiceContent = firstChoice?.message?.content;
+
+  if (typeof choiceContent === "string" && choiceContent.trim()) {
+    return {
+      text: choiceContent.trim(),
+      diagnostics,
+    };
+  }
+
+  const choiceText = extractTextFromContentItems(choiceContent);
+
+  if (choiceText) {
+    return {
+      text: choiceText,
+      diagnostics,
+    };
+  }
+
+  return { text: null, diagnostics };
+}
+
+function unwrapMarkdownCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+
+  return fencedMatch?.[1]?.trim() ?? trimmed;
+}
+
+function findFirstTopLevelJsonObject(text: string): string | null {
+  const trimmed = unwrapMarkdownCodeFence(text);
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return trimmed;
+  }
+
+  let depth = 0;
+  let inString = false;
+  let isEscaped = false;
+  let startIndex = -1;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index];
+
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
+    }
+
+    if (character === "\\") {
+      isEscaped = true;
+      continue;
+    }
+
+    if (character === "\"") {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (character === "{") {
+      if (depth === 0) {
+        startIndex = index;
+      }
+
+      depth += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      depth -= 1;
+
+      if (depth === 0 && startIndex >= 0) {
+        return trimmed.slice(startIndex, index + 1);
+      }
+    }
   }
 
   return null;
 }
 
-function parseFileUpdatePayload(text: string): OpenAIFileUpdatePayload {
-  return JSON.parse(text) as OpenAIFileUpdatePayload;
+export function parseFileUpdatePayload(text: string): OpenAIFileUpdatePayload {
+  const candidateJson = findFirstTopLevelJsonObject(text);
+
+  if (!candidateJson) {
+    throw new Error("OpenAI response text did not contain a top-level JSON object.");
+  }
+
+  return JSON.parse(candidateJson) as OpenAIFileUpdatePayload;
+}
+
+function renderDiagnosticsSection(
+  diagnostics: ResponseDiagnostics | undefined,
+  rawModelText: string | undefined,
+): string[] {
+  if (!diagnostics && !rawModelText) {
+    return [];
+  }
+
+  const lines = ["## Diagnostics"];
+
+  if (diagnostics) {
+    lines.push(
+      `- Response ID: ${diagnostics.responseId ?? "Unavailable"}`,
+      `- Response status: ${diagnostics.responseStatus ?? "Unavailable"}`,
+      `- Finish reason: ${diagnostics.finishReason ?? "Unavailable"}`,
+      `- Output item types: ${diagnostics.outputItemTypes.length > 0 ? diagnostics.outputItemTypes.join(", ") : "Unavailable"}`,
+      `- Output item statuses: ${diagnostics.outputStatuses.length > 0 ? diagnostics.outputStatuses.join(", ") : "Unavailable"}`,
+    );
+  }
+
+  if (rawModelText) {
+    lines.push("", "## Raw extracted model text (truncated)", "```text", rawModelText, "```");
+  }
+
+  lines.push("");
+
+  return lines;
 }
 
 function renderCodeGenerationLog(
@@ -105,6 +318,8 @@ function renderCodeGenerationLog(
   filesChanged: string[],
   refusedFiles: string[],
   errors: string[],
+  diagnostics?: ResponseDiagnostics,
+  rawModelText?: string,
 ): string {
   return [
     "# TheSkeleton code generation log",
@@ -136,6 +351,7 @@ function renderCodeGenerationLog(
     "## Errors",
     ...(errors.length > 0 ? errors.map((error) => `- ${error}`) : ["- None"]),
     "",
+    ...renderDiagnosticsSection(diagnostics, rawModelText),
     "Generated code must be reviewed before it is committed, pushed, or included in a pull request.",
     "",
   ].join("\n");
@@ -149,6 +365,8 @@ async function writeCodeGenerationLog(
   filesChanged: string[],
   refusedFiles: string[],
   errors: string[],
+  diagnostics?: ResponseDiagnostics,
+  rawModelText?: string,
 ): Promise<void> {
   await mkdir(dirname(CODE_GENERATION_LOG_FILE_PATH), { recursive: true });
   await writeFile(
@@ -161,6 +379,8 @@ async function writeCodeGenerationLog(
       filesChanged,
       refusedFiles,
       errors,
+      diagnostics,
+      rawModelText,
     ),
     "utf8",
   );
@@ -194,16 +414,34 @@ async function requestCodeChanges(
   model: string,
   apiKey: string,
   context: CodeGenerationContext,
-): Promise<string> {
+): Promise<{
+  extractedText: string;
+  diagnostics: ResponseDiagnostics;
+}> {
   const prompt = [
     "You are generating safe React TypeScript code updates for ProjectX.",
     `Target app path: ${TARGET_APP_PATH}`,
     "Return JSON only.",
+    "Do not use markdown.",
+    "Do not include explanations outside JSON.",
     'Return shape: {"files":[{"path":"apps/theskeleton/src/...","content":"..."}]}',
-    "Do not add markdown fences.",
-    "Do not modify package.json.",
-    "Do not include real OAuth secrets, client IDs, backend calls, or environment values.",
-    "Create a clear placeholder auth boundary for future Google login wiring.",
+    "Only propose file updates for the explicitly listed allowed files.",
+    "Prefer modifying existing scaffold files.",
+    "Do not create new files unless they are explicitly listed in the allowed paths.",
+    "Do not create requirements, plans, PR summaries, logs, docs, or output files inside apps/theskeleton.",
+    "Requirements live in ProjectX output/requirements, not inside the React app.",
+    "Do not create auth.tsx.",
+    "Keep all auth boundary code inside apps/theskeleton/src/auth/googleAuthPlaceholder.ts for this POC.",
+    "Keep UI code inside apps/theskeleton/src/App.tsx for this POC.",
+    "No secrets.",
+    "No real Google client ID.",
+    "No package.json changes.",
+    "No dependency changes.",
+    "",
+    "Allowed files for this run:",
+    ...promptAllowedFiles.map((filePath) => `- ${filePath}`),
+    "",
+    "The model must not return any other path.",
     "",
     "Approved requirements:",
     context.requirements,
@@ -236,13 +474,37 @@ async function requestCodeChanges(
   }
 
   const payload = (await response.json()) as unknown;
-  const responseText = extractResponseText(payload);
+  const extracted = extractResponseText(payload);
 
-  if (!responseText) {
-    throw new Error("OpenAI response did not contain JSON output text.");
+  if (!extracted.text) {
+    await writeCodeGenerationLog(
+      "failed",
+      model,
+      [
+        REQUIREMENTS_FILE_PATH,
+        IMPLEMENTATION_PLAN_FILE_PATH,
+        "apps/theskeleton/src/App.tsx",
+        "apps/theskeleton/src/main.tsx",
+        "apps/theskeleton/src/auth/googleAuthPlaceholder.ts",
+      ],
+      [],
+      [],
+      [],
+      [
+        `OpenAI response did not contain JSON output text. See diagnostic log: ${CODE_GENERATION_LOG_FILE_PATH}`,
+      ],
+      extracted.diagnostics,
+    );
+
+    throw new Error(
+      `OpenAI response did not contain JSON output text. See diagnostic log: ${CODE_GENERATION_LOG_FILE_PATH}`,
+    );
   }
 
-  return responseText;
+  return {
+    extractedText: extracted.text,
+    diagnostics: extracted.diagnostics,
+  };
 }
 
 export async function generateCodeWithOpenAI(
@@ -286,12 +548,37 @@ export async function generateCodeWithOpenAI(
 
   try {
     const context = await buildCodeGenerationContext();
-    const responseText = await requestCodeChanges(
+    const { extractedText, diagnostics } = await requestCodeChanges(
       model,
       env.OPENAI_API_KEY,
       context,
     );
-    const parsedPayload = parseFileUpdatePayload(responseText);
+    let parsedPayload: OpenAIFileUpdatePayload;
+
+    try {
+      parsedPayload = parseFileUpdatePayload(extractedText);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to parse OpenAI JSON response.";
+
+      await writeCodeGenerationLog(
+        "failed",
+        model,
+        filesRead,
+        [],
+        filesChanged,
+        refusedFiles,
+        [`${message} See diagnostic log: ${CODE_GENERATION_LOG_FILE_PATH}`],
+        diagnostics,
+        truncateText(extractedText),
+      );
+
+      throw new Error(
+        `${message} See diagnostic log: ${CODE_GENERATION_LOG_FILE_PATH}`,
+      );
+    }
 
     if (!Array.isArray(parsedPayload.files)) {
       throw new Error("OpenAI response JSON must contain a files array.");
@@ -354,6 +641,14 @@ export async function generateCodeWithOpenAI(
     }
 
     const succeeded = errors.length === 0;
+    const proposedUnsafeFiles = refusedFiles.length > 0;
+    const logErrors = [...errors];
+
+    if (proposedUnsafeFiles) {
+      logErrors.unshift(
+        "The model proposed files outside the allowed list. No unsafe files were written.",
+      );
+    }
 
     await writeCodeGenerationLog(
       succeeded ? "complete" : "refused",
@@ -362,7 +657,8 @@ export async function generateCodeWithOpenAI(
       parsedPayload.files.map((file) => file.path),
       filesChanged,
       refusedFiles,
-      errors,
+      logErrors,
+      diagnostics,
     );
 
     const result: CodeGenerationResult = {
@@ -374,8 +670,8 @@ export async function generateCodeWithOpenAI(
       refusedFiles,
     };
 
-    if (errors.length > 0) {
-      result.error = errors.join(" ");
+    if (logErrors.length > 0) {
+      result.error = logErrors.join(" ");
     }
 
     return result;
@@ -385,17 +681,7 @@ export async function generateCodeWithOpenAI(
         ? error.message
         : "OpenAI code generation failed with an unknown error.";
 
-    await writeCodeGenerationLog(
-      "failed",
-      model,
-      filesRead,
-      [],
-      filesChanged,
-      refusedFiles,
-      [message],
-    );
-
-    return {
+    const result: CodeGenerationResult = {
       attempted: true,
       succeeded: false,
       model,
@@ -404,5 +690,19 @@ export async function generateCodeWithOpenAI(
       refusedFiles,
       error: message,
     };
+
+    if (!(await readFileIfPresent(CODE_GENERATION_LOG_FILE_PATH))) {
+      await writeCodeGenerationLog(
+        "failed",
+        model,
+        filesRead,
+        [],
+        filesChanged,
+        refusedFiles,
+        [message],
+      );
+    }
+
+    return result;
   }
 }

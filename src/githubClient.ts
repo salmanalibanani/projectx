@@ -276,7 +276,9 @@ async function findExistingOpenPullRequest(
   const result: PullRequestResult = {
     created: false,
     existing: true,
+    alreadyExists: true,
     sourceBranch,
+    headBranch: sourceBranch,
     baseBranch,
   };
 
@@ -304,7 +306,9 @@ export async function createGitHubPullRequest(
     return {
       created: false,
       existing: false,
+      alreadyExists: false,
       sourceBranch,
+      headBranch: sourceBranch,
       baseBranch,
       error: `Missing required environment variables: ${config.join(", ")}`,
     };
@@ -345,7 +349,9 @@ export async function createGitHubPullRequest(
       return {
         created: false,
         existing: false,
+        alreadyExists: false,
         sourceBranch,
+        headBranch: sourceBranch,
         baseBranch,
         error: `GitHub pull request creation failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
       };
@@ -355,7 +361,9 @@ export async function createGitHubPullRequest(
     const result: PullRequestResult = {
       created: true,
       existing: false,
+      alreadyExists: false,
       sourceBranch,
+      headBranch: sourceBranch,
       baseBranch,
     };
 
@@ -372,7 +380,9 @@ export async function createGitHubPullRequest(
     return {
       created: false,
       existing: false,
+      alreadyExists: false,
       sourceBranch,
+      headBranch: sourceBranch,
       baseBranch,
       error:
         error instanceof Error
