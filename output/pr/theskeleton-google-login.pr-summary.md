@@ -1,6 +1,6 @@
 # TheSkeleton PR summary draft
 
-Status: draft
+Status: approved
 
 Work item ID: theskeleton-google-login
 
