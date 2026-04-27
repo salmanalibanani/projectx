@@ -1,6 +1,11 @@
 import { generateAppScaffold } from "./appScaffold.js";
 import { createGitHubIssue } from "./githubClient.js";
-import { ensureImplementationBranch, getCurrentBranch } from "./gitClient.js";
+import {
+  ensureImplementationBranch,
+  getCurrentBranch,
+  isWorkingTreeClean,
+  pushBranchToOrigin,
+} from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { draftPrSummary } from "./prSummary.js";
 import { readPrSummaryStatus } from "./prSummaryApproval.js";
@@ -41,6 +46,9 @@ async function main() {
   const shouldVerifyAppScaffold = args.includes("--verify-app-scaffold");
   const shouldDraftPrSummary = args.includes("--draft-pr-summary");
   const shouldPreparePr = args.includes("--prepare-pr");
+  const shouldPushImplementationBranch = args.includes(
+    "--push-implementation-branch",
+  );
   const userRequest = args
     .filter(
       (arg) =>
@@ -50,7 +58,8 @@ async function main() {
         arg !== "--generate-app-scaffold" &&
         arg !== "--verify-app-scaffold" &&
         arg !== "--draft-pr-summary" &&
-        arg !== "--prepare-pr",
+        arg !== "--prepare-pr" &&
+        arg !== "--push-implementation-branch",
     )
     .join(" ");
 
@@ -272,6 +281,49 @@ async function main() {
         ready: false,
         reason: "PR summary file does not exist.",
         prSummaryFile,
+        requiredStatus: "approved",
+        actualStatus: "draft",
+      };
+    }
+  }
+
+  if (shouldPushImplementationBranch) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.branchPush = {
+          pushed: false,
+          error:
+            "PR summary must be approved before pushing implementation branch.",
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.branchPush = {
+            pushed: false,
+            error: `Implementation branch can only be pushed from branch ${requiredBranchName}.`,
+          };
+        } else if (!(await isWorkingTreeClean())) {
+          result.branchPush = {
+            pushed: false,
+            error:
+              "Working tree must be clean before pushing implementation branch.",
+          };
+        } else {
+          result.branchPush = await pushBranchToOrigin(requiredBranchName);
+        }
+      }
+    } catch {
+      result.branchPush = {
+        pushed: false,
+        error: "PR summary must be approved before pushing implementation branch.",
         requiredStatus: "approved",
         actualStatus: "draft",
       };

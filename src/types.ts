@@ -100,6 +100,15 @@ export type PrPreparationResult = {
   baseBranch?: string;
 };
 
+export type BranchPushResult = {
+  pushed: boolean;
+  branchName?: string;
+  remote?: string;
+  error?: string;
+  requiredStatus?: "approved";
+  actualStatus?: PrSummaryStatus;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -127,5 +136,6 @@ export type OrchestratorResult = {
   scaffoldVerification?: ScaffoldVerificationResult;
   prSummary?: PrSummaryResult;
   prPreparation?: PrPreparationResult;
+  branchPush?: BranchPushResult;
   nextRecommendedAction: string;
 };

@@ -39,7 +39,7 @@ Prepare the initial TheSkeleton application scaffold and supporting ProjectX art
 ## Reviewer checklist
 
 - [ ] Requirements were approved
-- [ ] Implementation plan was approved
+- [ ] Implementation plan was approve
 - [ ] Scaffold files reviewed
 - [ ] ProjectX build passed
 - [ ] TheSkeleton build passed
