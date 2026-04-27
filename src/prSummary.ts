@@ -115,6 +115,7 @@ export async function draftPrSummary(
   return {
     generated: true,
     file: PR_SUMMARY_FILE_PATH,
+    path: PR_SUMMARY_FILE_PATH,
     sourceBranch: IMPLEMENTATION_BRANCH,
     baseBranch: BASE_BRANCH,
   };

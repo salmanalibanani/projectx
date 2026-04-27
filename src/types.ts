@@ -94,6 +94,7 @@ export type AppVerificationResult = {
 export type PrSummaryResult = {
   generated: boolean;
   file: string;
+  path?: string;
   sourceBranch: string;
   baseBranch: string;
   error?: string;
@@ -120,10 +121,12 @@ export type BranchPushResult = {
 
 export type PullRequestResult = {
   created: boolean;
-  existing: boolean;
+  existing?: boolean;
+  alreadyExists?: boolean;
   number?: number;
   url?: string;
   sourceBranch?: string;
+  headBranch?: string;
   baseBranch?: string;
   error?: string;
 };

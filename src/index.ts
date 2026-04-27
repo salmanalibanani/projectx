@@ -31,15 +31,20 @@ import { readRequirementsStatus } from "./requirementsApproval.js";
 import { verifyApp, verifyAppScaffold } from "./scaffoldVerification.js";
 
 const knownFlags = new Set([
+  "--create-pr",
   "--generate-requirements",
+  "--approve-requirements",
   "--create-github-issue",
   "--generate-implementation-plan",
+  "--approve-implementation-plan",
   "--prepare-implementation",
   "--create-implementation-branch",
+  "--scaffold-app",
   "--generate-app-scaffold",
   "--generate-code",
   "--verify-app",
   "--verify-app-scaffold",
+  "--generate-pr-summary",
   "--draft-pr-summary",
   "--prepare-pr",
   "--push-implementation-branch",
@@ -236,6 +241,7 @@ async function draftPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     result.prSummary = {
       generated: false,
       file: PR_SUMMARY_FILE_PATH,
+      path: PR_SUMMARY_FILE_PATH,
       sourceBranch: IMPLEMENTATION_BRANCH,
       baseBranch: BASE_BRANCH,
       error: `PR summary can only be drafted from branch ${IMPLEMENTATION_BRANCH}.`,
@@ -247,6 +253,7 @@ async function draftPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     result.prSummary = {
       generated: false,
       file: PR_SUMMARY_FILE_PATH,
+      path: PR_SUMMARY_FILE_PATH,
       sourceBranch: IMPLEMENTATION_BRANCH,
       baseBranch: BASE_BRANCH,
       error: "App verification artifact must exist before drafting PR summary.",
@@ -336,8 +343,9 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     if (prSummaryStatus !== "approved") {
       result.pullRequest = {
         created: false,
-        existing: false,
+        alreadyExists: false,
         sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
         baseBranch: BASE_BRANCH,
         error: "PR summary must be approved before opening pull request.",
       };
@@ -349,8 +357,9 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     if (currentBranch !== IMPLEMENTATION_BRANCH) {
       result.pullRequest = {
         created: false,
-        existing: false,
+        alreadyExists: false,
         sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
         baseBranch: BASE_BRANCH,
         error: `Pull request can only be opened from branch ${IMPLEMENTATION_BRANCH}.`,
       };
@@ -360,8 +369,9 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     if (!(await isWorkingTreeClean())) {
       result.pullRequest = {
         created: false,
-        existing: false,
+        alreadyExists: false,
         sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
         baseBranch: BASE_BRANCH,
         error: "Working tree must be clean before opening pull request.",
       };
@@ -373,10 +383,24 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     if (missingEnvVars.length > 0) {
       result.pullRequest = {
         created: false,
-        existing: false,
+        alreadyExists: false,
         sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
         baseBranch: BASE_BRANCH,
         error: `Missing required environment variables: ${missingEnvVars.join(", ")}`,
+      };
+      return;
+    }
+
+    if (!(await fileExists(PR_SUMMARY_FILE_PATH))) {
+      result.pullRequest = {
+        created: false,
+        alreadyExists: false,
+        sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
+        baseBranch: BASE_BRANCH,
+        error:
+          "PR summary file does not exist. Run --generate-pr-summary first.",
       };
       return;
     }
@@ -389,13 +413,14 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
       BASE_BRANCH,
     );
   } catch {
-    result.pullRequest = {
-      created: false,
-      existing: false,
-      sourceBranch: IMPLEMENTATION_BRANCH,
-      baseBranch: BASE_BRANCH,
-      error: "PR summary must be approved before opening pull request.",
-    };
+      result.pullRequest = {
+        created: false,
+        alreadyExists: false,
+        sourceBranch: IMPLEMENTATION_BRANCH,
+        headBranch: IMPLEMENTATION_BRANCH,
+        baseBranch: BASE_BRANCH,
+        error: "PR summary must be approved before opening pull request.",
+      };
   }
 }
 
@@ -424,20 +449,24 @@ async function main() {
     "--create-implementation-branch",
   );
   const shouldGenerateAppScaffold =
-    hasFlag(args, "--generate-app-scaffold") || shouldRunAllSafeLocal;
+    hasFlag(args, "--generate-app-scaffold") ||
+    hasFlag(args, "--scaffold-app") ||
+    shouldRunAllSafeLocal;
   const shouldGenerateCode = hasFlag(args, "--generate-code");
   const shouldVerifyApp =
     hasFlag(args, "--verify-app") ||
     hasFlag(args, "--verify-app-scaffold") ||
     shouldRunAllSafeLocal;
   const shouldDraftPrSummary =
-    hasFlag(args, "--draft-pr-summary") || shouldRunAllSafeLocal;
+    hasFlag(args, "--draft-pr-summary") ||
+    hasFlag(args, "--generate-pr-summary") ||
+    shouldRunAllSafeLocal;
   const shouldPreparePr = hasFlag(args, "--prepare-pr");
   const shouldPushImplementationBranch = hasFlag(
     args,
     "--push-implementation-branch",
   );
-  const shouldOpenPr = hasFlag(args, "--open-pr");
+  const shouldOpenPr = hasFlag(args, "--open-pr") || hasFlag(args, "--create-pr");
   const shouldWritePocSummary =
     hasFlag(args, "--poc-summary") || shouldRunAllSafeLocal;
 
