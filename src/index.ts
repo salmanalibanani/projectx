@@ -2,10 +2,32 @@ import { generateAppScaffold } from "./appScaffold.js";
 import { createGitHubIssue } from "./githubClient.js";
 import { ensureImplementationBranch, getCurrentBranch } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
+import { draftPrSummary } from "./prSummary.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { verifyAppScaffold } from "./scaffoldVerification.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
+
+async function refreshApprovalStatuses(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+  const requirementsFilePath = result.generatedFiles.find((filePath) =>
+    filePath.endsWith(".requirements.md"),
+  );
+  const implementationPlanFilePath = result.generatedFiles.find((filePath) =>
+    filePath.endsWith(".implementation-plan.md"),
+  );
+
+  if (requirementsFilePath) {
+    result.requirementsDraft.status = await readRequirementsStatus(
+      requirementsFilePath,
+    );
+  }
+
+  if (implementationPlanFilePath) {
+    result.implementationPlan.status = await readImplementationPlanStatus(
+      implementationPlanFilePath,
+    );
+  }
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -16,6 +38,7 @@ async function main() {
   );
   const shouldGenerateAppScaffold = args.includes("--generate-app-scaffold");
   const shouldVerifyAppScaffold = args.includes("--verify-app-scaffold");
+  const shouldDraftPrSummary = args.includes("--draft-pr-summary");
   const userRequest = args
     .filter(
       (arg) =>
@@ -23,7 +46,8 @@ async function main() {
         arg !== "--prepare-implementation" &&
         arg !== "--create-implementation-branch" &&
         arg !== "--generate-app-scaffold" &&
-        arg !== "--verify-app-scaffold",
+        arg !== "--verify-app-scaffold" &&
+        arg !== "--draft-pr-summary",
     )
     .join(" ");
 
@@ -37,6 +61,7 @@ async function main() {
 
   const result = await runOrchestrator(userRequest);
   await writeOrchestratorOutput(result);
+  await refreshApprovalStatuses(result);
 
   if (shouldCreateGitHubIssue) {
     const requirementsFilePath = result.generatedFiles.find((filePath) =>
@@ -193,6 +218,23 @@ async function main() {
 
   if (shouldVerifyAppScaffold) {
     result.scaffoldVerification = await verifyAppScaffold();
+  }
+
+  if (shouldDraftPrSummary) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const currentBranch = await getCurrentBranch();
+
+    if (currentBranch !== requiredBranchName) {
+      result.prSummary = {
+        generated: false,
+        file: "output/pr/theskeleton-google-login.pr-summary.md",
+        sourceBranch: requiredBranchName,
+        baseBranch: "main",
+        error: `PR summary can only be drafted from branch ${requiredBranchName}.`,
+      };
+    } else {
+      result.prSummary = await draftPrSummary(result);
+    }
   }
 
   console.log(JSON.stringify(result, null, 2));

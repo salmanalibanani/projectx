@@ -81,6 +81,14 @@ export type ScaffoldVerificationResult = {
   missingFiles: string[];
 };
 
+export type PrSummaryResult = {
+  generated: boolean;
+  file: string;
+  sourceBranch: string;
+  baseBranch: string;
+  error?: string;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -106,5 +114,6 @@ export type OrchestratorResult = {
   implementationBranch?: ImplementationBranchResult;
   appScaffold?: AppScaffoldResult;
   scaffoldVerification?: ScaffoldVerificationResult;
+  prSummary?: PrSummaryResult;
   nextRecommendedAction: string;
 };
