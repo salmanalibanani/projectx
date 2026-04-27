@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import { TARGET_APP_PATH } from "./projectxConfig.js";
 import type { AppScaffoldResult } from "./types.js";
 
-const appPath = "apps/theskeleton";
+const appPath = TARGET_APP_PATH;
 
-const scaffoldFiles = {
+export const scaffoldFiles = {
   "apps/theskeleton/package.json": `{
   "name": "theskeleton",
   "private": true,

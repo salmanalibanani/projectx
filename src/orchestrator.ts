@@ -7,13 +7,20 @@ import type {
   RequirementsDraft,
   Task,
 } from "./types.js";
-
-const workItemId = "theskeleton-google-login";
-const requirementsFilePath =
-  "output/requirements/theskeleton-google-login.requirements.md";
-const implementationPlanFilePath =
-  "output/plans/theskeleton-google-login.implementation-plan.md";
-const issueFilePath = "output/issues/theskeleton-google-login.md";
+import {
+  BASE_BRANCH,
+  defaultGeneratedFiles,
+  IMPLEMENTATION_BRANCH,
+  IMPLEMENTATION_PLAN_FILE_PATH,
+  ISSUE_FILE_PATH,
+  ISSUE_TITLE,
+  REPO_MODE,
+  REQUIREMENTS_FILE_PATH,
+  SYSTEM_NAME,
+  TARGET_APP_NAME,
+  TARGET_APP_PATH,
+  WORK_ITEM_ID,
+} from "./projectxConfig.js";
 
 const phases: Phase[] = [
   {
@@ -91,13 +98,13 @@ const approvalGates: ApprovalGate[] = [
 ];
 
 const issueDraft: IssueDraft = {
-  workItemId,
-  title: "Build TheSkeleton Google login authentication",
+  workItemId: WORK_ITEM_ID,
+  title: ISSUE_TITLE,
   labels: ["app:theskeleton", "type:feature", "status:planned"],
   body: [
     "<!-- projectx",
-    `workItemId: ${workItemId}`,
-    "targetApp: TheSkeleton",
+    `workItemId: ${WORK_ITEM_ID}`,
+    `targetApp: ${TARGET_APP_NAME}`,
     "artifactType: implementation-issue",
     "-->",
     "",
@@ -140,10 +147,10 @@ export async function runOrchestrator(
   request: string,
 ): Promise<OrchestratorResult> {
   const requirementsDraft: RequirementsDraft = {
-    workItemId,
+    workItemId: WORK_ITEM_ID,
     title: "TheSkeleton Google login requirements draft",
     sourceRequest: request,
-    targetAppName: "TheSkeleton",
+    targetAppName: TARGET_APP_NAME,
     status: "draft",
     sections: [
       {
@@ -214,11 +221,11 @@ export async function runOrchestrator(
   };
 
   const implementationPlan: ImplementationPlan = {
-    workItemId,
+    workItemId: WORK_ITEM_ID,
     title: "TheSkeleton Google login implementation plan",
-    sourceRequirementsFile: requirementsFilePath,
+    sourceRequirementsFile: REQUIREMENTS_FILE_PATH,
     status: "draft",
-    targetAppName: "TheSkeleton",
+    targetAppName: TARGET_APP_NAME,
     sections: [
       {
         title: "Summary",
@@ -284,21 +291,21 @@ export async function runOrchestrator(
   };
 
   return {
-    workItemId,
+    workItemId: WORK_ITEM_ID,
     request,
-    systemName: "ProjectX",
-    targetAppName: "TheSkeleton",
+    systemName: SYSTEM_NAME,
+    targetAppName: TARGET_APP_NAME,
+    repoMode: REPO_MODE,
+    targetAppPath: TARGET_APP_PATH,
+    implementationBranch: IMPLEMENTATION_BRANCH,
+    baseBranch: BASE_BRANCH,
     goal: "Plan the creation of TheSkeleton, a React app with Google login authentication, while keeping ProjectX simple and deterministic.",
     phases,
     approvalGates,
     requirementsDraft,
     implementationPlan,
     issueDraft,
-    generatedFiles: [
-      requirementsFilePath,
-      implementationPlanFilePath,
-      issueFilePath,
-    ],
+    generatedFiles: defaultGeneratedFiles,
     githubIssue: {
       created: false,
     },
