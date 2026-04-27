@@ -1,19 +1,29 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import type { OrchestratorResult, PrSummaryResult } from "./types.js";
+import { readPrSummaryStatus } from "./prSummaryApproval.js";
+import type {
+  OrchestratorResult,
+  PrSummaryResult,
+  PrSummaryStatus,
+} from "./types.js";
 
 const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
 const sourceBranch = "feature/theskeleton-google-login";
 const baseBranch = "main";
 
-function renderPrSummaryMarkdown(result: OrchestratorResult): string {
+function renderPrSummaryMarkdown(
+  result: OrchestratorResult,
+  status: PrSummaryStatus,
+): string {
   const relatedIssue =
     result.githubIssue.url ??
     "Not created yet. Use the deterministic implementation issue draft or local issue artifact.";
 
   return [
     "# TheSkeleton PR summary draft",
+    "",
+    `Status: ${status}`,
     "",
     `Work item ID: ${result.workItemId}`,
     "",
@@ -60,8 +70,16 @@ function renderPrSummaryMarkdown(result: OrchestratorResult): string {
 export async function draftPrSummary(
   result: OrchestratorResult,
 ): Promise<PrSummaryResult> {
+  let status: PrSummaryStatus = "draft";
+
+  try {
+    status = await readPrSummaryStatus(prSummaryFile);
+  } catch {
+    status = "draft";
+  }
+
   await mkdir(dirname(prSummaryFile), { recursive: true });
-  await writeFile(prSummaryFile, renderPrSummaryMarkdown(result), "utf8");
+  await writeFile(prSummaryFile, renderPrSummaryMarkdown(result, status), "utf8");
 
   return {
     generated: true,

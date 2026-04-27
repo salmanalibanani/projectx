@@ -3,6 +3,7 @@ import { createGitHubIssue } from "./githubClient.js";
 import { ensureImplementationBranch, getCurrentBranch } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { draftPrSummary } from "./prSummary.js";
+import { readPrSummaryStatus } from "./prSummaryApproval.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { verifyAppScaffold } from "./scaffoldVerification.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
@@ -39,6 +40,7 @@ async function main() {
   const shouldGenerateAppScaffold = args.includes("--generate-app-scaffold");
   const shouldVerifyAppScaffold = args.includes("--verify-app-scaffold");
   const shouldDraftPrSummary = args.includes("--draft-pr-summary");
+  const shouldPreparePr = args.includes("--prepare-pr");
   const userRequest = args
     .filter(
       (arg) =>
@@ -47,7 +49,8 @@ async function main() {
         arg !== "--create-implementation-branch" &&
         arg !== "--generate-app-scaffold" &&
         arg !== "--verify-app-scaffold" &&
-        arg !== "--draft-pr-summary",
+        arg !== "--draft-pr-summary" &&
+        arg !== "--prepare-pr",
     )
     .join(" ");
 
@@ -234,6 +237,44 @@ async function main() {
       };
     } else {
       result.prSummary = await draftPrSummary(result);
+    }
+  }
+
+  if (shouldPreparePr) {
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.prPreparation = {
+          ready: false,
+          reason:
+            "PR summary must be approved before preparing pull request.",
+          prSummaryFile,
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+        };
+      } else {
+        result.prPreparation = {
+          ready: true,
+          reason:
+            "PR summary is approved. ProjectX may proceed to branch push and PR creation in the next milestone.",
+          prSummaryFile,
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+          sourceBranch: "feature/theskeleton-google-login",
+          baseBranch: "main",
+        };
+      }
+    } catch {
+      result.prPreparation = {
+        ready: false,
+        reason: "PR summary file does not exist.",
+        prSummaryFile,
+        requiredStatus: "approved",
+        actualStatus: "draft",
+      };
     }
   }
 

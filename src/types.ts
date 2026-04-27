@@ -30,6 +30,7 @@ export type RequirementsSection = {
 
 export type RequirementsStatus = "draft" | "approved";
 export type ImplementationPlanStatus = "draft" | "approved";
+export type PrSummaryStatus = "draft" | "approved";
 
 export type RequirementsDraft = {
   workItemId: string;
@@ -89,6 +90,16 @@ export type PrSummaryResult = {
   error?: string;
 };
 
+export type PrPreparationResult = {
+  ready: boolean;
+  reason: string;
+  prSummaryFile: string;
+  requiredStatus: "approved";
+  actualStatus: PrSummaryStatus;
+  sourceBranch?: string;
+  baseBranch?: string;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -115,5 +126,6 @@ export type OrchestratorResult = {
   appScaffold?: AppScaffoldResult;
   scaffoldVerification?: ScaffoldVerificationResult;
   prSummary?: PrSummaryResult;
+  prPreparation?: PrPreparationResult;
   nextRecommendedAction: string;
 };
