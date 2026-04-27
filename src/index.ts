@@ -1,5 +1,11 @@
+import { readFile } from "node:fs/promises";
+
 import { generateAppScaffold } from "./appScaffold.js";
-import { createGitHubIssue } from "./githubClient.js";
+import {
+  createGitHubIssue,
+  createGitHubPullRequest,
+  getMissingGitHubEnvVars,
+} from "./githubClient.js";
 import {
   ensureImplementationBranch,
   getCurrentBranch,
@@ -49,6 +55,7 @@ async function main() {
   const shouldPushImplementationBranch = args.includes(
     "--push-implementation-branch",
   );
+  const shouldOpenPr = args.includes("--open-pr");
   const userRequest = args
     .filter(
       (arg) =>
@@ -59,7 +66,8 @@ async function main() {
         arg !== "--verify-app-scaffold" &&
         arg !== "--draft-pr-summary" &&
         arg !== "--prepare-pr" &&
-        arg !== "--push-implementation-branch",
+        arg !== "--push-implementation-branch" &&
+        arg !== "--open-pr",
     )
     .join(" ");
 
@@ -326,6 +334,75 @@ async function main() {
         error: "PR summary must be approved before pushing implementation branch.",
         requiredStatus: "approved",
         actualStatus: "draft",
+      };
+    }
+  }
+
+  if (shouldOpenPr) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const baseBranch = "main";
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.pullRequest = {
+          created: false,
+          existing: false,
+          sourceBranch: requiredBranchName,
+          baseBranch,
+          error: "PR summary must be approved before opening pull request.",
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.pullRequest = {
+            created: false,
+            existing: false,
+            sourceBranch: requiredBranchName,
+            baseBranch,
+            error: `Pull request can only be opened from branch ${requiredBranchName}.`,
+          };
+        } else if (!(await isWorkingTreeClean())) {
+          result.pullRequest = {
+            created: false,
+            existing: false,
+            sourceBranch: requiredBranchName,
+            baseBranch,
+            error: "Working tree must be clean before opening pull request.",
+          };
+        } else {
+          const missingEnvVars = getMissingGitHubEnvVars(process.env);
+
+          if (missingEnvVars.length > 0) {
+            result.pullRequest = {
+              created: false,
+              existing: false,
+              sourceBranch: requiredBranchName,
+              baseBranch,
+              error: `Missing required environment variables: ${missingEnvVars.join(", ")}`,
+            };
+          } else {
+            const prBody = await readFile(prSummaryFile, "utf8");
+
+            result.pullRequest = await createGitHubPullRequest(
+              result.issueDraft.title,
+              prBody,
+              requiredBranchName,
+              baseBranch,
+            );
+          }
+        }
+      }
+    } catch {
+      result.pullRequest = {
+        created: false,
+        existing: false,
+        sourceBranch: requiredBranchName,
+        baseBranch,
+        error: "PR summary must be approved before opening pull request.",
       };
     }
   }

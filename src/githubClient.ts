@@ -1,4 +1,8 @@
-import type { GitHubIssueResult, IssueDraft } from "./types.js";
+import type {
+  GitHubIssueResult,
+  IssueDraft,
+  PullRequestResult,
+} from "./types.js";
 
 type GitHubConfig = {
   token: string;
@@ -11,6 +15,18 @@ type GitHubIssueApiResponse = {
   html_url?: string;
   number?: number;
   title?: string;
+};
+
+type GitHubPullRequestApiResponse = {
+  html_url?: string;
+  number?: number;
+  state?: string;
+  head?: {
+    ref?: string;
+  };
+  base?: {
+    ref?: string;
+  };
 };
 
 function getGitHubHeaders(config: GitHubConfig): HeadersInit {
@@ -86,7 +102,7 @@ async function findExistingOpenIssue(
   return result;
 }
 
-function getMissingGitHubEnvVars(env: NodeJS.ProcessEnv): string[] {
+export function getMissingGitHubEnvVars(env: NodeJS.ProcessEnv): string[] {
   const requiredVars = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"] as const;
 
   return requiredVars.filter((name) => !env[name]);
@@ -179,6 +195,152 @@ export async function createGitHubIssue(
         error instanceof Error
           ? `GitHub issue creation failed: ${error.message}`
           : "GitHub issue creation failed: unknown error",
+    };
+  }
+}
+
+async function findExistingOpenPullRequest(
+  config: GitHubConfig,
+  sourceBranch: string,
+  baseBranch: string,
+): Promise<PullRequestResult | null> {
+  const response = await fetch(
+    `https://api.github.com/repos/${config.owner}/${config.repo}/pulls?state=open&head=${config.owner}:${sourceBranch}&base=${baseBranch}`,
+    {
+      method: "GET",
+      headers: getGitHubHeaders(config),
+    },
+  );
+
+  if (!response.ok) {
+    const responseText = await response.text();
+
+    return {
+      created: false,
+      existing: false,
+      sourceBranch,
+      baseBranch,
+      error: `GitHub pull request lookup failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
+    };
+  }
+
+  const pullRequests = (await response.json()) as GitHubPullRequestApiResponse[];
+  const existingPullRequest = pullRequests.find(
+    (pullRequest) =>
+      pullRequest.state === "open" &&
+      pullRequest.head?.ref === sourceBranch &&
+      pullRequest.base?.ref === baseBranch,
+  );
+
+  if (!existingPullRequest) {
+    return null;
+  }
+
+  const result: PullRequestResult = {
+    created: false,
+    existing: true,
+    sourceBranch,
+    baseBranch,
+  };
+
+  if (existingPullRequest.number !== undefined) {
+    result.number = existingPullRequest.number;
+  }
+
+  if (existingPullRequest.html_url !== undefined) {
+    result.url = existingPullRequest.html_url;
+  }
+
+  return result;
+}
+
+export async function createGitHubPullRequest(
+  title: string,
+  body: string,
+  sourceBranch: string,
+  baseBranch: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<PullRequestResult> {
+  const config = getGitHubConfig(env);
+
+  if (Array.isArray(config)) {
+    return {
+      created: false,
+      existing: false,
+      sourceBranch,
+      baseBranch,
+      error: `Missing required environment variables: ${config.join(", ")}`,
+    };
+  }
+
+  try {
+    const existingPullRequestResult = await findExistingOpenPullRequest(
+      config,
+      sourceBranch,
+      baseBranch,
+    );
+
+    if (existingPullRequestResult?.error) {
+      return existingPullRequestResult;
+    }
+
+    if (existingPullRequestResult) {
+      return existingPullRequestResult;
+    }
+
+    const response = await fetch(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/pulls`,
+      {
+        method: "POST",
+        headers: getGitHubHeaders(config),
+        body: JSON.stringify({
+          title,
+          body,
+          head: sourceBranch,
+          base: baseBranch,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const responseText = await response.text();
+
+      return {
+        created: false,
+        existing: false,
+        sourceBranch,
+        baseBranch,
+        error: `GitHub pull request creation failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
+      };
+    }
+
+    const data = (await response.json()) as GitHubPullRequestApiResponse;
+    const result: PullRequestResult = {
+      created: true,
+      existing: false,
+      sourceBranch,
+      baseBranch,
+    };
+
+    if (data.number !== undefined) {
+      result.number = data.number;
+    }
+
+    if (data.html_url !== undefined) {
+      result.url = data.html_url;
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      created: false,
+      existing: false,
+      sourceBranch,
+      baseBranch,
+      error:
+        error instanceof Error
+          ? `GitHub pull request creation failed: ${error.message}`
+          : "GitHub pull request creation failed: unknown error",
     };
   }
 }

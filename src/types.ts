@@ -109,6 +109,16 @@ export type BranchPushResult = {
   actualStatus?: PrSummaryStatus;
 };
 
+export type PullRequestResult = {
+  created: boolean;
+  existing: boolean;
+  number?: number;
+  url?: string;
+  sourceBranch?: string;
+  baseBranch?: string;
+  error?: string;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -137,5 +147,6 @@ export type OrchestratorResult = {
   prSummary?: PrSummaryResult;
   prPreparation?: PrPreparationResult;
   branchPush?: BranchPushResult;
+  pullRequest?: PullRequestResult;
   nextRecommendedAction: string;
 };
