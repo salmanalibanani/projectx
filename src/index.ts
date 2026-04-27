@@ -3,6 +3,7 @@ import { createGitHubIssue } from "./githubClient.js";
 import { ensureImplementationBranch, getCurrentBranch } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
 import { runOrchestrator } from "./orchestrator.js";
+import { verifyAppScaffold } from "./scaffoldVerification.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
 
@@ -14,13 +15,15 @@ async function main() {
     "--create-implementation-branch",
   );
   const shouldGenerateAppScaffold = args.includes("--generate-app-scaffold");
+  const shouldVerifyAppScaffold = args.includes("--verify-app-scaffold");
   const userRequest = args
     .filter(
       (arg) =>
         arg !== "--create-github-issue" &&
         arg !== "--prepare-implementation" &&
         arg !== "--create-implementation-branch" &&
-        arg !== "--generate-app-scaffold",
+        arg !== "--generate-app-scaffold" &&
+        arg !== "--verify-app-scaffold",
     )
     .join(" ");
 
@@ -186,6 +189,10 @@ async function main() {
         }
       }
     }
+  }
+
+  if (shouldVerifyAppScaffold) {
+    result.scaffoldVerification = await verifyAppScaffold();
   }
 
   console.log(JSON.stringify(result, null, 2));

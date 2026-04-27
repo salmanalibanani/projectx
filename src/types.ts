@@ -74,6 +74,13 @@ export type AppScaffoldResult = {
   conflicts?: string[];
 };
 
+export type ScaffoldVerificationResult = {
+  verified: boolean;
+  verificationFile: string;
+  checkedFiles: string[];
+  missingFiles: string[];
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -98,5 +105,6 @@ export type OrchestratorResult = {
   implementationPreparation?: ImplementationPreparationResult;
   implementationBranch?: ImplementationBranchResult;
   appScaffold?: AppScaffoldResult;
+  scaffoldVerification?: ScaffoldVerificationResult;
   nextRecommendedAction: string;
 };
