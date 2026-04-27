@@ -30,6 +30,7 @@ export type RequirementsSection = {
 
 export type RequirementsStatus = "draft" | "approved";
 export type ImplementationPlanStatus = "draft" | "approved";
+export type PrSummaryStatus = "draft" | "approved";
 
 export type RequirementsDraft = {
   workItemId: string;
@@ -66,6 +67,58 @@ export type ImplementationBranchResult = {
   error?: string;
 };
 
+export type AppScaffoldResult = {
+  generated: boolean;
+  appPath: string;
+  files: string[];
+  error?: string;
+  conflicts?: string[];
+};
+
+export type ScaffoldVerificationResult = {
+  verified: boolean;
+  verificationFile: string;
+  checkedFiles: string[];
+  missingFiles: string[];
+};
+
+export type PrSummaryResult = {
+  generated: boolean;
+  file: string;
+  sourceBranch: string;
+  baseBranch: string;
+  error?: string;
+};
+
+export type PrPreparationResult = {
+  ready: boolean;
+  reason: string;
+  prSummaryFile: string;
+  requiredStatus: "approved";
+  actualStatus: PrSummaryStatus;
+  sourceBranch?: string;
+  baseBranch?: string;
+};
+
+export type BranchPushResult = {
+  pushed: boolean;
+  branchName?: string;
+  remote?: string;
+  error?: string;
+  requiredStatus?: "approved";
+  actualStatus?: PrSummaryStatus;
+};
+
+export type PullRequestResult = {
+  created: boolean;
+  existing: boolean;
+  number?: number;
+  url?: string;
+  sourceBranch?: string;
+  baseBranch?: string;
+  error?: string;
+};
+
 export type GitHubIssueResult = {
   created: boolean;
   existing?: boolean;
@@ -89,5 +142,11 @@ export type OrchestratorResult = {
   githubIssue: GitHubIssueResult;
   implementationPreparation?: ImplementationPreparationResult;
   implementationBranch?: ImplementationBranchResult;
+  appScaffold?: AppScaffoldResult;
+  scaffoldVerification?: ScaffoldVerificationResult;
+  prSummary?: PrSummaryResult;
+  prPreparation?: PrPreparationResult;
+  branchPush?: BranchPushResult;
+  pullRequest?: PullRequestResult;
   nextRecommendedAction: string;
 };

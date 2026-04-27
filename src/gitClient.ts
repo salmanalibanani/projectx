@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import type { ImplementationBranchResult } from "./types.js";
+import type { BranchPushResult, ImplementationBranchResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -13,12 +13,20 @@ async function runGitCommand(args: string[]): Promise<string> {
   return stdout.trim();
 }
 
+export async function isWorkingTreeClean(): Promise<boolean> {
+  const statusOutput = await runGitCommand(["status", "--porcelain"]);
+
+  return statusOutput === "";
+}
+
+export async function getCurrentBranch(): Promise<string> {
+  return runGitCommand(["rev-parse", "--abbrev-ref", "HEAD"]);
+}
+
 export async function ensureImplementationBranch(
   branchName: string,
 ): Promise<ImplementationBranchResult> {
-  const statusOutput = await runGitCommand(["status", "--porcelain"]);
-
-  if (statusOutput !== "") {
+  if (!(await isWorkingTreeClean())) {
     return {
       branchName,
       created: false,
@@ -49,4 +57,26 @@ export async function ensureImplementationBranch(
     existing: false,
     switched: true,
   };
+}
+
+export async function pushBranchToOrigin(
+  branchName: string,
+): Promise<BranchPushResult> {
+  try {
+    await runGitCommand(["push", "-u", "origin", branchName]);
+
+    return {
+      pushed: true,
+      branchName,
+      remote: "origin",
+    };
+  } catch (error) {
+    return {
+      pushed: false,
+      error:
+        error instanceof Error
+          ? `Failed to push implementation branch: ${error.message}`
+          : "Failed to push implementation branch.",
+    };
+  }
 }

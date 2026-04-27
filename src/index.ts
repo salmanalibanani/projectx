@@ -1,9 +1,45 @@
-import { createGitHubIssue } from "./githubClient.js";
-import { ensureImplementationBranch } from "./gitClient.js";
+import { readFile } from "node:fs/promises";
+
+import { generateAppScaffold } from "./appScaffold.js";
+import {
+  createGitHubIssue,
+  createGitHubPullRequest,
+  getMissingGitHubEnvVars,
+} from "./githubClient.js";
+import {
+  ensureImplementationBranch,
+  getCurrentBranch,
+  isWorkingTreeClean,
+  pushBranchToOrigin,
+} from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
+import { draftPrSummary } from "./prSummary.js";
+import { readPrSummaryStatus } from "./prSummaryApproval.js";
 import { runOrchestrator } from "./orchestrator.js";
+import { verifyAppScaffold } from "./scaffoldVerification.js";
 import { writeOrchestratorOutput } from "./outputWriter.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
+
+async function refreshApprovalStatuses(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+  const requirementsFilePath = result.generatedFiles.find((filePath) =>
+    filePath.endsWith(".requirements.md"),
+  );
+  const implementationPlanFilePath = result.generatedFiles.find((filePath) =>
+    filePath.endsWith(".implementation-plan.md"),
+  );
+
+  if (requirementsFilePath) {
+    result.requirementsDraft.status = await readRequirementsStatus(
+      requirementsFilePath,
+    );
+  }
+
+  if (implementationPlanFilePath) {
+    result.implementationPlan.status = await readImplementationPlanStatus(
+      implementationPlanFilePath,
+    );
+  }
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -12,12 +48,26 @@ async function main() {
   const shouldCreateImplementationBranch = args.includes(
     "--create-implementation-branch",
   );
+  const shouldGenerateAppScaffold = args.includes("--generate-app-scaffold");
+  const shouldVerifyAppScaffold = args.includes("--verify-app-scaffold");
+  const shouldDraftPrSummary = args.includes("--draft-pr-summary");
+  const shouldPreparePr = args.includes("--prepare-pr");
+  const shouldPushImplementationBranch = args.includes(
+    "--push-implementation-branch",
+  );
+  const shouldOpenPr = args.includes("--open-pr");
   const userRequest = args
     .filter(
       (arg) =>
         arg !== "--create-github-issue" &&
         arg !== "--prepare-implementation" &&
-        arg !== "--create-implementation-branch",
+        arg !== "--create-implementation-branch" &&
+        arg !== "--generate-app-scaffold" &&
+        arg !== "--verify-app-scaffold" &&
+        arg !== "--draft-pr-summary" &&
+        arg !== "--prepare-pr" &&
+        arg !== "--push-implementation-branch" &&
+        arg !== "--open-pr",
     )
     .join(" ");
 
@@ -31,6 +81,7 @@ async function main() {
 
   const result = await runOrchestrator(userRequest);
   await writeOrchestratorOutput(result);
+  await refreshApprovalStatuses(result);
 
   if (shouldCreateGitHubIssue) {
     const requirementsFilePath = result.generatedFiles.find((filePath) =>
@@ -137,6 +188,222 @@ async function main() {
         result.implementationBranch =
           await ensureImplementationBranch(branchName);
       }
+    }
+  }
+
+  if (shouldGenerateAppScaffold) {
+    const implementationPlanFilePath = result.generatedFiles.find((filePath) =>
+      filePath.endsWith(".implementation-plan.md"),
+    );
+    const requiredBranchName = `feature/${result.workItemId}`;
+
+    if (!implementationPlanFilePath) {
+      result.appScaffold = {
+        generated: false,
+        appPath: "apps/theskeleton",
+        files: [],
+        error: "Implementation plan file path is missing from generatedFiles.",
+      };
+    } else {
+      const implementationPlanStatus = await readImplementationPlanStatus(
+        implementationPlanFilePath,
+      );
+
+      result.implementationPlan.status = implementationPlanStatus;
+
+      if (implementationPlanStatus !== "approved") {
+        result.appScaffold = {
+          generated: false,
+          appPath: "apps/theskeleton",
+          files: [],
+          error:
+            "Implementation plan must be approved before generating app scaffold.",
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.appScaffold = {
+            generated: false,
+            appPath: "apps/theskeleton",
+            files: [],
+            error: `App scaffold can only be generated on branch ${requiredBranchName}.`,
+          };
+        } else {
+          result.appScaffold = await generateAppScaffold();
+        }
+      }
+    }
+  }
+
+  if (shouldVerifyAppScaffold) {
+    result.scaffoldVerification = await verifyAppScaffold();
+  }
+
+  if (shouldDraftPrSummary) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const currentBranch = await getCurrentBranch();
+
+    if (currentBranch !== requiredBranchName) {
+      result.prSummary = {
+        generated: false,
+        file: "output/pr/theskeleton-google-login.pr-summary.md",
+        sourceBranch: requiredBranchName,
+        baseBranch: "main",
+        error: `PR summary can only be drafted from branch ${requiredBranchName}.`,
+      };
+    } else {
+      result.prSummary = await draftPrSummary(result);
+    }
+  }
+
+  if (shouldPreparePr) {
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.prPreparation = {
+          ready: false,
+          reason:
+            "PR summary must be approved before preparing pull request.",
+          prSummaryFile,
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+        };
+      } else {
+        result.prPreparation = {
+          ready: true,
+          reason:
+            "PR summary is approved. ProjectX may proceed to branch push and PR creation in the next milestone.",
+          prSummaryFile,
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+          sourceBranch: "feature/theskeleton-google-login",
+          baseBranch: "main",
+        };
+      }
+    } catch {
+      result.prPreparation = {
+        ready: false,
+        reason: "PR summary file does not exist.",
+        prSummaryFile,
+        requiredStatus: "approved",
+        actualStatus: "draft",
+      };
+    }
+  }
+
+  if (shouldPushImplementationBranch) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.branchPush = {
+          pushed: false,
+          error:
+            "PR summary must be approved before pushing implementation branch.",
+          requiredStatus: "approved",
+          actualStatus: prSummaryStatus,
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.branchPush = {
+            pushed: false,
+            error: `Implementation branch can only be pushed from branch ${requiredBranchName}.`,
+          };
+        } else if (!(await isWorkingTreeClean())) {
+          result.branchPush = {
+            pushed: false,
+            error:
+              "Working tree must be clean before pushing implementation branch.",
+          };
+        } else {
+          result.branchPush = await pushBranchToOrigin(requiredBranchName);
+        }
+      }
+    } catch {
+      result.branchPush = {
+        pushed: false,
+        error: "PR summary must be approved before pushing implementation branch.",
+        requiredStatus: "approved",
+        actualStatus: "draft",
+      };
+    }
+  }
+
+  if (shouldOpenPr) {
+    const requiredBranchName = `feature/${result.workItemId}`;
+    const baseBranch = "main";
+    const prSummaryFile = "output/pr/theskeleton-google-login.pr-summary.md";
+
+    try {
+      const prSummaryStatus = await readPrSummaryStatus(prSummaryFile);
+
+      if (prSummaryStatus !== "approved") {
+        result.pullRequest = {
+          created: false,
+          existing: false,
+          sourceBranch: requiredBranchName,
+          baseBranch,
+          error: "PR summary must be approved before opening pull request.",
+        };
+      } else {
+        const currentBranch = await getCurrentBranch();
+
+        if (currentBranch !== requiredBranchName) {
+          result.pullRequest = {
+            created: false,
+            existing: false,
+            sourceBranch: requiredBranchName,
+            baseBranch,
+            error: `Pull request can only be opened from branch ${requiredBranchName}.`,
+          };
+        } else if (!(await isWorkingTreeClean())) {
+          result.pullRequest = {
+            created: false,
+            existing: false,
+            sourceBranch: requiredBranchName,
+            baseBranch,
+            error: "Working tree must be clean before opening pull request.",
+          };
+        } else {
+          const missingEnvVars = getMissingGitHubEnvVars(process.env);
+
+          if (missingEnvVars.length > 0) {
+            result.pullRequest = {
+              created: false,
+              existing: false,
+              sourceBranch: requiredBranchName,
+              baseBranch,
+              error: `Missing required environment variables: ${missingEnvVars.join(", ")}`,
+            };
+          } else {
+            const prBody = await readFile(prSummaryFile, "utf8");
+
+            result.pullRequest = await createGitHubPullRequest(
+              result.issueDraft.title,
+              prBody,
+              requiredBranchName,
+              baseBranch,
+            );
+          }
+        }
+      }
+    } catch {
+      result.pullRequest = {
+        created: false,
+        existing: false,
+        sourceBranch: requiredBranchName,
+        baseBranch,
+        error: "PR summary must be approved before opening pull request.",
+      };
     }
   }
 
