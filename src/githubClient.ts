@@ -166,6 +166,43 @@ export async function createGitHubIssue(
     if (!response.ok) {
       const responseText = await response.text();
 
+      if (response.status === 422) {
+        const fallbackResponse = await fetch(
+          `https://api.github.com/repos/${config.owner}/${config.repo}/issues`,
+          {
+            method: "POST",
+            headers: getGitHubHeaders(config),
+            body: JSON.stringify({
+              title: issueDraft.title,
+              body: issueDraft.body,
+            }),
+          },
+        );
+
+        if (fallbackResponse.ok) {
+          const fallbackData =
+            (await fallbackResponse.json()) as GitHubIssueApiResponse;
+
+          const result: GitHubIssueResult = {
+            created: true,
+            existing: false,
+            warnings: [
+              "GitHub issue was created without labels because one or more labels could not be applied.",
+            ],
+          };
+
+          if (fallbackData.html_url !== undefined) {
+            result.url = fallbackData.html_url;
+          }
+
+          if (fallbackData.number !== undefined) {
+            result.number = fallbackData.number;
+          }
+
+          return result;
+        }
+      }
+
       return {
         created: false,
         error: `GitHub issue creation failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,

@@ -1,7 +1,12 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
+import {
+  IMPLEMENTATION_PLAN_FILE_PATH,
+  ISSUE_FILE_PATH,
+  REQUIREMENTS_FILE_PATH,
+} from "./projectxConfig.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
 import type { OrchestratorResult } from "./types.js";
 
@@ -69,63 +74,94 @@ function renderImplementationPlanMarkdown(
   ].join("\n");
 }
 
+async function writeFileIfMissingOrSame(
+  filePath: string,
+  contents: string,
+): Promise<void> {
+  try {
+    const existingContents = await readFile(filePath, "utf8");
+
+    if (existingContents !== contents) {
+      return;
+    }
+  } catch (error) {
+    const fileError = error as NodeJS.ErrnoException;
+
+    if (fileError.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, contents, "utf8");
+}
+
+export async function writeRequirementsDraft(
+  result: OrchestratorResult,
+): Promise<void> {
+  let status = result.requirementsDraft.status;
+
+  try {
+    status = await readRequirementsStatus(REQUIREMENTS_FILE_PATH);
+  } catch {
+    status = result.requirementsDraft.status;
+  }
+
+  await writeFileIfMissingOrSame(
+    REQUIREMENTS_FILE_PATH,
+    renderRequirementsMarkdown({
+      ...result,
+      requirementsDraft: {
+        ...result.requirementsDraft,
+        status,
+      },
+    }),
+  );
+}
+
+export async function writeIssueDraft(result: OrchestratorResult): Promise<void> {
+  await writeFileIfMissingOrSame(ISSUE_FILE_PATH, renderIssueMarkdown(result));
+}
+
+export async function writeImplementationPlan(
+  result: OrchestratorResult,
+): Promise<void> {
+  let sourceRequirementsStatus = result.requirementsDraft.status;
+  let implementationPlanStatus = result.implementationPlan.status;
+
+  try {
+    sourceRequirementsStatus = await readRequirementsStatus(REQUIREMENTS_FILE_PATH);
+  } catch {
+    sourceRequirementsStatus = result.requirementsDraft.status;
+  }
+
+  try {
+    implementationPlanStatus = await readImplementationPlanStatus(
+      IMPLEMENTATION_PLAN_FILE_PATH,
+    );
+  } catch {
+    implementationPlanStatus = result.implementationPlan.status;
+  }
+
+  await writeFileIfMissingOrSame(
+    IMPLEMENTATION_PLAN_FILE_PATH,
+    renderImplementationPlanMarkdown(
+      {
+        ...result,
+        implementationPlan: {
+          ...result.implementationPlan,
+          status: implementationPlanStatus,
+        },
+      },
+      sourceRequirementsStatus,
+    ),
+  );
+}
+
 export async function writeOrchestratorOutput(
   result: OrchestratorResult,
 ): Promise<void> {
-  const requirementsFilePath = result.generatedFiles.find((filePath) =>
-    filePath.endsWith(".requirements.md"),
-  );
-
-  for (const filePath of result.generatedFiles) {
-    let fileContents = renderIssueMarkdown(result);
-
-    if (filePath.endsWith(".requirements.md")) {
-      const requirementsDraft = { ...result.requirementsDraft };
-
-      try {
-        requirementsDraft.status = await readRequirementsStatus(filePath);
-      } catch {
-        requirementsDraft.status = result.requirementsDraft.status;
-      }
-
-      fileContents = renderRequirementsMarkdown({
-        ...result,
-        requirementsDraft,
-      });
-    }
-
-    if (filePath.endsWith(".implementation-plan.md")) {
-      let sourceRequirementsStatus = result.requirementsDraft.status;
-      let implementationPlanStatus = result.implementationPlan.status;
-
-      if (requirementsFilePath) {
-        try {
-          sourceRequirementsStatus =
-            await readRequirementsStatus(requirementsFilePath);
-        } catch {
-          sourceRequirementsStatus = result.requirementsDraft.status;
-        }
-      }
-
-      try {
-        implementationPlanStatus = await readImplementationPlanStatus(filePath);
-      } catch {
-        implementationPlanStatus = result.implementationPlan.status;
-      }
-
-      fileContents = renderImplementationPlanMarkdown(
-        {
-          ...result,
-          implementationPlan: {
-            ...result.implementationPlan,
-            status: implementationPlanStatus,
-          },
-        },
-        sourceRequirementsStatus,
-      );
-    }
-
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, fileContents, "utf8");
-  }
+  await writeRequirementsDraft(result);
+  await writeImplementationPlan(result);
+  await writeIssueDraft(result);
 }

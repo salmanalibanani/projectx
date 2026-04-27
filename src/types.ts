@@ -31,6 +31,7 @@ export type RequirementsSection = {
 export type RequirementsStatus = "draft" | "approved";
 export type ImplementationPlanStatus = "draft" | "approved";
 export type PrSummaryStatus = "draft" | "approved";
+export type RepoMode = "monorepo";
 
 export type RequirementsDraft = {
   workItemId: string;
@@ -82,6 +83,14 @@ export type ScaffoldVerificationResult = {
   missingFiles: string[];
 };
 
+export type AppVerificationResult = {
+  verified: boolean;
+  verificationFile: string;
+  checkedFiles: string[];
+  missingFiles: string[];
+  warnings: string[];
+};
+
 export type PrSummaryResult = {
   generated: boolean;
   file: string;
@@ -125,12 +134,33 @@ export type GitHubIssueResult = {
   url?: string;
   number?: number;
   error?: string;
+  warnings?: string[];
+};
+
+export type CodeGenerationResult = {
+  attempted: boolean;
+  succeeded: boolean;
+  model?: string;
+  logFile: string;
+  filesChanged: string[];
+  refusedFiles: string[];
+  error?: string;
+};
+
+export type PocSummaryResult = {
+  generated: boolean;
+  file: string;
+  error?: string;
 };
 
 export type OrchestratorResult = {
   workItemId: string;
   systemName: string;
   targetAppName: string;
+  repoMode: RepoMode;
+  targetAppPath: string;
+  implementationBranch: string;
+  baseBranch: string;
   request: string;
   goal: string;
   phases: Phase[];
@@ -141,12 +171,15 @@ export type OrchestratorResult = {
   generatedFiles: string[];
   githubIssue: GitHubIssueResult;
   implementationPreparation?: ImplementationPreparationResult;
-  implementationBranch?: ImplementationBranchResult;
+  implementationBranchResult?: ImplementationBranchResult;
   appScaffold?: AppScaffoldResult;
   scaffoldVerification?: ScaffoldVerificationResult;
+  appVerification?: AppVerificationResult;
+  codeGeneration?: CodeGenerationResult;
   prSummary?: PrSummaryResult;
   prPreparation?: PrPreparationResult;
   branchPush?: BranchPushResult;
   pullRequest?: PullRequestResult;
+  pocSummary?: PocSummaryResult;
   nextRecommendedAction: string;
 };
