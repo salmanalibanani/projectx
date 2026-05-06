@@ -31,7 +31,7 @@ export type RequirementsSection = {
 export type RequirementsStatus = "draft" | "approved";
 export type ImplementationPlanStatus = "draft" | "approved";
 export type PrSummaryStatus = "draft" | "approved";
-export type RepoMode = "monorepo";
+export type RepoMode = "monorepo" | "standalone";
 
 export type RequirementsDraft = {
   workItemId: string;

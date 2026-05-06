@@ -1,12 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 
-import { generateAppScaffold } from "./appScaffold.js";
-import { generateCodeWithOpenAI } from "./codeGeneration.js";
 import {
   createGitHubIssue,
   createGitHubPullRequest,
   getMissingGitHubEnvVars,
 } from "./githubClient.js";
+import { createGitHubRepository } from "./github/createRepo.js";
 import {
   ensureImplementationBranch,
   getCurrentBranch,
@@ -14,21 +13,25 @@ import {
   pushBranchToOrigin,
 } from "./gitClient.js";
 import { readImplementationPlanStatus } from "./implementationPlanApproval.js";
-import { writeOrchestratorOutput, writeImplementationPlan, writeIssueDraft, writeRequirementsDraft } from "./outputWriter.js";
+import {
+  writeOrchestratorOutput,
+  writeImplementationPlan,
+  writeIssueDraft,
+  writeRequirementsDraft,
+} from "./outputWriter.js";
 import { runOrchestrator } from "./orchestrator.js";
 import { writePocSummary } from "./pocSummary.js";
 import {
+  APP_VERIFICATION_FILE_PATH,
   BASE_BRANCH,
   IMPLEMENTATION_BRANCH,
   IMPLEMENTATION_PLAN_FILE_PATH,
   PR_SUMMARY_FILE_PATH,
   REQUIREMENTS_FILE_PATH,
-  TARGET_APP_PATH,
 } from "./projectxConfig.js";
 import { draftPrSummary } from "./prSummary.js";
 import { readPrSummaryStatus } from "./prSummaryApproval.js";
 import { readRequirementsStatus } from "./requirementsApproval.js";
-import { verifyApp, verifyAppScaffold } from "./scaffoldVerification.js";
 
 const knownFlags = new Set([
   "--create-pr",
@@ -39,11 +42,6 @@ const knownFlags = new Set([
   "--approve-implementation-plan",
   "--prepare-implementation",
   "--create-implementation-branch",
-  "--scaffold-app",
-  "--generate-app-scaffold",
-  "--generate-code",
-  "--verify-app",
-  "--verify-app-scaffold",
   "--generate-pr-summary",
   "--draft-pr-summary",
   "--prepare-pr",
@@ -70,7 +68,9 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function refreshApprovalStatuses(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function refreshApprovalStatuses(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   try {
     result.requirementsDraft.status = await readRequirementsStatus(
       REQUIREMENTS_FILE_PATH,
@@ -92,12 +92,16 @@ function hasExplicitFlags(args: string[]): boolean {
   return args.some((arg) => knownFlags.has(arg));
 }
 
-async function generateRequirements(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function generateRequirements(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   await writeRequirementsDraft(result);
   await refreshApprovalStatuses(result);
 }
 
-async function generateImplementationPlan(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function generateImplementationPlan(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   await refreshApprovalStatuses(result);
 
   if (result.requirementsDraft.status !== "approved") {
@@ -110,7 +114,9 @@ async function generateImplementationPlan(result: Awaited<ReturnType<typeof runO
   await refreshApprovalStatuses(result);
 }
 
-async function prepareImplementation(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function prepareImplementation(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   await refreshApprovalStatuses(result);
 
   if (result.implementationPlan.status !== "approved") {
@@ -136,7 +142,9 @@ async function prepareImplementation(result: Awaited<ReturnType<typeof runOrches
   };
 }
 
-async function createImplementationBranch(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function createImplementationBranch(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   await refreshApprovalStatuses(result);
 
   if (result.implementationPlan.status !== "approved") {
@@ -156,84 +164,6 @@ async function createImplementationBranch(result: Awaited<ReturnType<typeof runO
   result.implementationBranchResult = branchResult;
 }
 
-async function generateScaffold(result: Awaited<ReturnType<typeof runOrchestrator>>) {
-  await refreshApprovalStatuses(result);
-
-  if (result.implementationPlan.status !== "approved") {
-    result.appScaffold = {
-      generated: false,
-      appPath: TARGET_APP_PATH,
-      files: [],
-      error:
-        "Implementation plan must be approved before generating app scaffold.",
-    };
-    return;
-  }
-
-  const currentBranch = await getCurrentBranch();
-
-  if (currentBranch !== IMPLEMENTATION_BRANCH) {
-    result.appScaffold = {
-      generated: false,
-      appPath: TARGET_APP_PATH,
-      files: [],
-      error: `App scaffold can only be generated on branch ${IMPLEMENTATION_BRANCH}.`,
-    };
-    return;
-  }
-
-  result.appScaffold = await generateAppScaffold();
-}
-
-async function generateCode(result: Awaited<ReturnType<typeof runOrchestrator>>) {
-  await refreshApprovalStatuses(result);
-
-  if (result.implementationPlan.status !== "approved") {
-    result.codeGeneration = {
-      attempted: false,
-      succeeded: false,
-      logFile: "output/code/theskeleton-google-login.code-generation.md",
-      filesChanged: [],
-      refusedFiles: [],
-      error: "Implementation plan must be approved before code generation.",
-    };
-    return;
-  }
-
-  const currentBranch = await getCurrentBranch();
-
-  if (currentBranch !== IMPLEMENTATION_BRANCH) {
-    result.codeGeneration = {
-      attempted: false,
-      succeeded: false,
-      logFile: "output/code/theskeleton-google-login.code-generation.md",
-      filesChanged: [],
-      refusedFiles: [],
-      error: `Code generation can only run on branch ${IMPLEMENTATION_BRANCH}.`,
-    };
-    return;
-  }
-
-  if (!(await fileExists(TARGET_APP_PATH))) {
-    result.codeGeneration = {
-      attempted: false,
-      succeeded: false,
-      logFile: "output/code/theskeleton-google-login.code-generation.md",
-      filesChanged: [],
-      refusedFiles: [],
-      error: "App scaffold must exist before code generation.",
-    };
-    return;
-  }
-
-  result.codeGeneration = await generateCodeWithOpenAI();
-}
-
-async function verifyApplication(result: Awaited<ReturnType<typeof runOrchestrator>>) {
-  result.appVerification = await verifyApp();
-  result.scaffoldVerification = await verifyAppScaffold();
-}
-
 async function draftPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
   const currentBranch = await getCurrentBranch();
 
@@ -249,7 +179,7 @@ async function draftPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
     return;
   }
 
-  if (!(await fileExists("output/verification/theskeleton-google-login.app-verification.md"))) {
+  if (!(await fileExists(APP_VERIFICATION_FILE_PATH))) {
     result.prSummary = {
       generated: false,
       file: PR_SUMMARY_FILE_PATH,
@@ -291,7 +221,9 @@ async function preparePr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
   }
 }
 
-async function pushImplementationBranch(result: Awaited<ReturnType<typeof runOrchestrator>>) {
+async function pushImplementationBranch(
+  result: Awaited<ReturnType<typeof runOrchestrator>>,
+) {
   try {
     const prSummaryStatus = await readPrSummaryStatus(PR_SUMMARY_FILE_PATH);
 
@@ -329,7 +261,8 @@ async function pushImplementationBranch(result: Awaited<ReturnType<typeof runOrc
   } catch {
     result.branchPush = {
       pushed: false,
-      error: "PR summary must be approved before pushing implementation branch.",
+      error:
+        "PR summary must be approved before pushing implementation branch.",
       requiredStatus: "approved",
       actualStatus: "draft",
     };
@@ -413,19 +346,115 @@ async function openPr(result: Awaited<ReturnType<typeof runOrchestrator>>) {
       BASE_BRANCH,
     );
   } catch {
-      result.pullRequest = {
-        created: false,
-        alreadyExists: false,
-        sourceBranch: IMPLEMENTATION_BRANCH,
-        headBranch: IMPLEMENTATION_BRANCH,
-        baseBranch: BASE_BRANCH,
-        error: "PR summary must be approved before opening pull request.",
-      };
+    result.pullRequest = {
+      created: false,
+      alreadyExists: false,
+      sourceBranch: IMPLEMENTATION_BRANCH,
+      headBranch: IMPLEMENTATION_BRANCH,
+      baseBranch: BASE_BRANCH,
+      error: "PR summary must be approved before opening pull request.",
+    };
   }
+}
+
+function parseCreateRepoArgs(args: string[]) {
+  const result = {
+    repoName: undefined as string | undefined,
+    isPublic: false,
+    description: undefined as string | undefined,
+    error: undefined as string | undefined,
+  };
+
+  if (args.length < 2) {
+    result.error =
+      'Usage: npm run dev -- create-repo <repo-name> [--public] [--description "text"]';
+    return result;
+  }
+
+  result.repoName = args[1];
+
+  for (let index = 2; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (!arg) {
+      continue;
+    }
+
+    if (arg === "--public") {
+      result.isPublic = true;
+      continue;
+    }
+
+    if (arg === "--description") {
+      if (index + 1 >= args.length) {
+        result.error = "--description requires a value.";
+        return result;
+      }
+
+      result.description = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--description=")) {
+      result.description = arg.slice("--description=".length);
+      continue;
+    }
+
+    result.error = `Unknown option: ${arg}`;
+    return result;
+  }
+
+  return result;
 }
 
 async function main() {
   const args = process.argv.slice(2);
+
+  if (args[0] === "create-repo") {
+    const { repoName, isPublic, description, error } =
+      parseCreateRepoArgs(args);
+
+    if (error || !repoName) {
+      console.error(error ?? "Repository name is required.");
+      process.exit(1);
+    }
+
+    console.log(`Creating GitHub repository: ${repoName}`);
+    console.log(`Owner: ${process.env.GITHUB_OWNER ?? "<missing>"}`);
+    console.log("");
+
+    const result = await createGitHubRepository(repoName, {
+      private: !isPublic,
+      description,
+    });
+
+    if (!result.created) {
+      if (result.alreadyExists) {
+        console.error(`Repository may already exist: ${result.url}`);
+        console.error(`Clone it locally with:`);
+        console.error(
+          `git clone https://github.com/${result.owner}/${result.repoName}.git`,
+        );
+        process.exit(1);
+      }
+
+      console.error(result.error ?? "Failed to create repository.");
+      process.exit(1);
+    }
+
+    console.log("Repository created successfully.");
+    console.log("");
+    console.log("URL:");
+    console.log(result.url);
+    console.log("");
+    console.log("Clone it locally with:");
+    console.log(
+      `git clone https://github.com/${result.owner}/${result.repoName}.git`,
+    );
+    process.exit(0);
+  }
+
   const userRequest = getUserRequest(args);
 
   if (!userRequest) {
@@ -448,15 +477,9 @@ async function main() {
     args,
     "--create-implementation-branch",
   );
-  const shouldGenerateAppScaffold =
-    hasFlag(args, "--generate-app-scaffold") ||
-    hasFlag(args, "--scaffold-app") ||
-    shouldRunAllSafeLocal;
-  const shouldGenerateCode = hasFlag(args, "--generate-code");
-  const shouldVerifyApp =
-    hasFlag(args, "--verify-app") ||
-    hasFlag(args, "--verify-app-scaffold") ||
-    shouldRunAllSafeLocal;
+  const shouldGenerateAppScaffold = false;
+  const shouldGenerateCode = false;
+  const shouldVerifyApp = false;
   const shouldDraftPrSummary =
     hasFlag(args, "--draft-pr-summary") ||
     hasFlag(args, "--generate-pr-summary") ||
@@ -466,7 +489,8 @@ async function main() {
     args,
     "--push-implementation-branch",
   );
-  const shouldOpenPr = hasFlag(args, "--open-pr") || hasFlag(args, "--create-pr");
+  const shouldOpenPr =
+    hasFlag(args, "--open-pr") || hasFlag(args, "--create-pr");
   const shouldWritePocSummary =
     hasFlag(args, "--poc-summary") || shouldRunAllSafeLocal;
 
@@ -503,18 +527,6 @@ async function main() {
 
   if (shouldCreateImplementationBranch) {
     await createImplementationBranch(result);
-  }
-
-  if (shouldGenerateAppScaffold) {
-    await generateScaffold(result);
-  }
-
-  if (shouldGenerateCode) {
-    await generateCode(result);
-  }
-
-  if (shouldVerifyApp) {
-    await verifyApplication(result);
   }
 
   if (shouldDraftPrSummary) {

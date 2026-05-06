@@ -1,25 +1,30 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { POC_SUMMARY_FILE_PATH } from "./projectxConfig.js";
+import {
+  OUTPUT_BASE_PATH,
+  POC_SUMMARY_FILE_PATH,
+  WORK_ITEM_ID,
+} from "./projectxConfig.js";
 import type { OrchestratorResult, PocSummaryResult } from "./types.js";
 
 function renderPocSummaryMarkdown(result: OrchestratorResult): string {
   const githubArtifacts = [
-    result.githubIssue.url ? `- GitHub issue: ${result.githubIssue.url}` : "- GitHub issue: not created yet",
+    result.githubIssue.url
+      ? `- GitHub issue: ${result.githubIssue.url}`
+      : "- GitHub issue: not created yet",
     result.pullRequest?.url
       ? `- Pull request: ${result.pullRequest.url}`
       : "- Pull request: not created yet",
   ];
 
   const localArtifacts = [
-    "- output/requirements/theskeleton-google-login.requirements.md",
-    "- output/issues/theskeleton-google-login.md",
-    "- output/plans/theskeleton-google-login.implementation-plan.md",
-    "- output/verification/theskeleton-google-login.app-verification.md",
-    "- output/pr/theskeleton-google-login.pr-summary.md",
-    "- output/code/theskeleton-google-login.code-generation.md",
-    "- output/poc/theskeleton-google-login.poc-summary.md",
+    `- ${OUTPUT_BASE_PATH}/requirements/${WORK_ITEM_ID}.requirements.md`,
+    `- ${OUTPUT_BASE_PATH}/issues/${WORK_ITEM_ID}.md`,
+    `- ${OUTPUT_BASE_PATH}/plans/${WORK_ITEM_ID}.implementation-plan.md`,
+    `- ${OUTPUT_BASE_PATH}/verification/${WORK_ITEM_ID}.app-verification.md`,
+    `- ${OUTPUT_BASE_PATH}/pr-summaries/${WORK_ITEM_ID}.pr-summary.md`,
+    `- ${OUTPUT_BASE_PATH}/logs/${WORK_ITEM_ID}.poc-summary.md`,
   ];
 
   return [
@@ -41,9 +46,9 @@ function renderPocSummaryMarkdown(result: OrchestratorResult): string {
     "- Implementation plan generation",
     "- Implementation plan approval gate",
     "- Guarded implementation branch creation",
-    "- Monorepo scaffold generation",
+    "- External target repository workflow direction",
     "- Optional OpenAI code generation hook",
-    "- App verification artifact",
+    "- Verification artifact generation",
     "- PR summary draft generation",
     "- PR summary approval gate",
     "- Guarded branch push",
