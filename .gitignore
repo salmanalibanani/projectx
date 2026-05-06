@@ -14,13 +14,12 @@ out/
 .env.local
 .env.*.local
 
-# Logs
-logs/
-
 # ProjectX orchestration output artifacts
 output/*
 !output/.gitkeep
 
+# Logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -35,31 +34,3 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
-
-# IDEs
-.idea/
-
-# Test coverage
-coverage/
-
-# Temporary files
-tmp/
-temp/
-
-# Runtime/cache
-.cache/
-.parcel-cache/
-.eslintcache
-
-# Azure / local emulator data
-.azurite/
-__azurite_db*__
-*.queue
-*.table
-*.blob
-
-# OpenAI / local secrets or generated files
-*.key
-*.pem
-secrets.json
-local.settings.json
