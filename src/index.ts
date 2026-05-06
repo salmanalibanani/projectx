@@ -450,7 +450,7 @@ async function main() {
     console.log("");
     console.log("Clone it locally with:");
     console.log(
-      `git clone https://github.com/${result.owner}/${result.repoName}.git`,
+      `git clone ${result.cloneUrl ?? `https://github.com/${result.owner}/${result.repoName}.git`}`,
     );
     process.exit(0);
   }

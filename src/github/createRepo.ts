@@ -87,17 +87,38 @@ export async function createGitHubRepository(
 
     const response = await octokit.request(apiEndpoint, requestParams);
 
+    if (!response?.data || typeof response.data !== "object") {
+      throw new Error("GitHub returned an unexpected repository response.");
+    }
+
+    const url =
+      typeof response.data.html_url === "string"
+        ? response.data.html_url
+        : `https://github.com/${targetOwner}/${repoName}`;
+    const cloneUrl =
+      typeof response.data.clone_url === "string"
+        ? response.data.clone_url
+        : `https://github.com/${targetOwner}/${repoName}.git`;
+
     return {
       created: true,
       owner: targetOwner,
       repoName,
-      url: response.data.html_url,
-      cloneUrl: response.data.clone_url,
+      url,
+      cloneUrl,
     };
   } catch (error) {
     const err = error as any;
+    const status = err.status ?? err?.response?.status;
+    const githubMessage =
+      err?.response?.data?.message ??
+      err?.message ??
+      "GitHub repository creation failed.";
+    const errorMessage = status
+      ? `GitHub error ${status}: ${githubMessage}`
+      : githubMessage;
 
-    if (err.status === 422) {
+    if (status === 422) {
       return {
         created: false,
         alreadyExists: true,
@@ -108,13 +129,12 @@ export async function createGitHubRepository(
       };
     }
 
-    if (err.status === 403) {
+    if (status === 403) {
       return {
         created: false,
         owner: targetOwner,
         repoName,
-        error:
-          "Permission denied. Check that the GitHub token can create repositories for the configured owner.",
+        error: `${errorMessage} Permission denied. Check that the GitHub token can create repositories for the configured owner.`,
       };
     }
 
@@ -122,9 +142,7 @@ export async function createGitHubRepository(
       created: false,
       owner: targetOwner,
       repoName,
-      error:
-        err?.message ??
-        "GitHub repository creation failed with an unexpected error.",
+      error: errorMessage,
     };
   }
 }

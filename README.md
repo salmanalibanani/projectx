@@ -36,6 +36,12 @@ npm run dev -- create-repo dgdocs-new-app --description "DG Docs app"
 npm run dev -- create-repo dgdocs-new-app --public
 ```
 
+PowerShell example using environment variables:
+
+```powershell
+npm run dev -- create-repo $env:GITHUB_REPO --description "$env:GITHUB_REPO_DESCRIPTION"
+```
+
 After repository creation, clone it manually:
 
 ```bash
