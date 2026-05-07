@@ -20,20 +20,20 @@ export GITHUB_OWNER=salmanalibanani
 For commands that operate on an existing target repository, also set:
 
 ```bash
-export GITHUB_REPO=dgdocs-new-app
+export GITHUB_REPO=my-new-app
 ```
 
 ## Create a new GitHub repository
 
 ```bash
-npm run dev -- create-repo dgdocs-new-app
+npm run dev -- create-repo my-new-app
 ```
 
 Optional flags:
 
 ```bash
-npm run dev -- create-repo dgdocs-new-app --description "DG Docs app"
-npm run dev -- create-repo dgdocs-new-app --public
+npm run dev -- create-repo my-new-app --description "My app"
+npm run dev -- create-repo my-new-app --public
 ```
 
 PowerShell example using environment variables:
@@ -45,7 +45,7 @@ npm run dev -- create-repo $env:GITHUB_REPO --description "$env:GITHUB_REPO_DESC
 After repository creation, clone it manually:
 
 ```bash
-git clone https://github.com/salmanalibanani/dgdocs-new-app.git
+git clone https://github.com/salmanalibanani/my-new-app.git
 ```
 
 ## Future workflow
@@ -63,7 +63,7 @@ ProjectX stores planning artifacts in target-specific folders under `output/`:
 
 ```text
 output/
-  dgdocs-new-app/
+  my-new-app/
     issues/
     requirements/
     plans/
