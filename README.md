@@ -73,13 +73,21 @@ npm install
 Run ProjectX in development mode:
 
 ```bash
+<<<<<<< HEAD
 npm run dev -- <command-or-request>
+=======
+export GITHUB_REPO=my-new-app
+>>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
 Build the project:
 
 ```bash
+<<<<<<< HEAD
 npm run build
+=======
+npm run dev -- create-repo my-new-app
+>>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
 ## Environment Variables
@@ -125,7 +133,12 @@ For private repos, the token needs repository access. If you want ProjectX to cr
 Start with the interactive initializer:
 
 ```bash
+<<<<<<< HEAD
 npm run dev -- init
+=======
+npm run dev -- create-repo my-new-app --description "My app"
+npm run dev -- create-repo my-new-app --public
+>>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
 `init` will ask for:
@@ -154,7 +167,11 @@ If the target repo is not accessible, ProjectX will tell you:
 After the token is set, run this again:
 
 ```bash
+<<<<<<< HEAD
 npm run dev -- init
+=======
+git clone https://github.com/salmanalibanani/my-new-app.git
+>>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
 ProjectX will re-check that the target repo exists and is accessible.
@@ -203,7 +220,11 @@ Typical layout:
 
 ```text
 output/
+<<<<<<< HEAD
   my-app/
+=======
+  my-new-app/
+>>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
     issues/
     requirements/
     plans/
