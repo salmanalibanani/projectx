@@ -1,4 +1,5 @@
 import type {
+  GitHubIssueDetails,
   GitHubIssueResult,
   IssueDraft,
   PullRequestResult,
@@ -14,6 +15,7 @@ type GitHubIssueApiResponse = {
   body?: string;
   html_url?: string;
   number?: number;
+  state?: string;
   title?: string;
 };
 
@@ -120,6 +122,112 @@ function getGitHubConfig(env: NodeJS.ProcessEnv): GitHubConfig | string[] {
     owner: env.GITHUB_OWNER!,
     repo: env.GITHUB_REPO!,
   };
+}
+
+export function parseGitHubIssueUrl(issueUrl: string): {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+} | null {
+  try {
+    const parsed = new URL(issueUrl.trim());
+
+    if (parsed.hostname !== "github.com") {
+      return null;
+    }
+
+    const parts = parsed.pathname.split("/").filter((segment) => segment !== "");
+
+    if (parts.length < 4 || parts[2] !== "issues") {
+      return null;
+    }
+
+    const owner = parts[0];
+    const repo = parts[1];
+    const issueNumber = Number.parseInt(parts[3] ?? "", 10);
+
+    if (!owner || !repo || Number.isNaN(issueNumber) || issueNumber <= 0) {
+      return null;
+    }
+
+    return {
+      owner,
+      repo,
+      issueNumber,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getGitHubIssueDetails(
+  issueUrl: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<GitHubIssueDetails> {
+  const parsedIssueUrl = parseGitHubIssueUrl(issueUrl);
+
+  if (!parsedIssueUrl) {
+    return {
+      found: false,
+      error: "Invalid GitHub issue URL.",
+    };
+  }
+
+  const token = env.GITHUB_TOKEN;
+  const headers: HeadersInit = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+
+  if (token && token.trim() !== "") {
+    headers.Authorization = `Bearer ${token.trim()}`;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${parsedIssueUrl.owner}/${parsedIssueUrl.repo}/issues/${parsedIssueUrl.issueNumber}`,
+      {
+        method: "GET",
+        headers,
+      },
+    );
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      return {
+        found: false,
+        error: `GitHub issue lookup failed: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
+      };
+    }
+
+    const issue = (await response.json()) as GitHubIssueApiResponse;
+
+    const result: GitHubIssueDetails = {
+      found: true,
+      owner: parsedIssueUrl.owner,
+      repo: parsedIssueUrl.repo,
+      number: issue.number ?? parsedIssueUrl.issueNumber,
+      url: issue.html_url ?? issueUrl,
+    };
+
+    if (issue.title !== undefined) {
+      result.title = issue.title;
+    }
+
+    if (issue.body !== undefined) {
+      result.body = issue.body;
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      found: false,
+      error:
+        error instanceof Error
+          ? `GitHub issue lookup failed: ${error.message}`
+          : "GitHub issue lookup failed.",
+    };
+  }
 }
 
 export async function createGitHubIssue(

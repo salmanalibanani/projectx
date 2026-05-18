@@ -5,10 +5,15 @@ export const SYSTEM_NAME = "ProjectX";
 export const TARGET_APP_NAME = "TheSkeleton";
 export const WORK_ITEM_ID = "theskeleton-google-login";
 export const REPO_MODE = "standalone";
+export const TARGET_REPO_URL =
+  process.env.TARGET_REPO_URL ??
+  (process.env.GITHUB_OWNER && process.env.GITHUB_REPO
+    ? `https://github.com/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}`
+    : "<target-repo-url>");
 export const TARGET_APP_PATH =
   process.env.TARGET_REPO_PATH ?? "<target-repo-path>";
 export const IMPLEMENTATION_BRANCH = "feature/theskeleton-google-login";
-export const BASE_BRANCH = "main";
+export const BASE_BRANCH = process.env.TARGET_BASE_BRANCH ?? "main";
 export const ISSUE_TITLE = "Build TheSkeleton Google login authentication";
 export const DEFAULT_OPENAI_MODEL = "gpt-4.1-mini";
 

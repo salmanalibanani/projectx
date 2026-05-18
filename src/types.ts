@@ -119,6 +119,31 @@ export type BranchPushResult = {
   actualStatus?: PrSummaryStatus;
 };
 
+export type TargetRepoCloneResult = {
+  cloned: boolean;
+  existing?: boolean;
+  path: string;
+  repoUrl: string;
+  baseBranch: string;
+  error?: string;
+};
+
+export type TargetRepoBranchResult = {
+  ready: boolean;
+  branchName: string;
+  path: string;
+  baseBranch: string;
+  existing?: boolean;
+  error?: string;
+};
+
+export type TargetRepoCommitResult = {
+  committed: boolean;
+  commitMessage?: string;
+  branchName?: string;
+  error?: string;
+};
+
 export type PullRequestResult = {
   created: boolean;
   existing?: boolean;
@@ -140,6 +165,17 @@ export type GitHubIssueResult = {
   warnings?: string[];
 };
 
+export type GitHubIssueDetails = {
+  found: boolean;
+  owner?: string;
+  repo?: string;
+  number?: number;
+  title?: string;
+  body?: string;
+  url?: string;
+  error?: string;
+};
+
 export type CodeGenerationResult = {
   attempted: boolean;
   succeeded: boolean;
@@ -147,6 +183,18 @@ export type CodeGenerationResult = {
   logFile: string;
   filesChanged: string[];
   refusedFiles: string[];
+  error?: string;
+};
+
+export type CodeGenerationPreparationResult = {
+  ready: boolean;
+  branchName: string;
+  issueUrl: string;
+  issueNumber: number;
+  issueTitle: string;
+  repoPath: string;
+  baseBranch: string;
+  logFile: string;
   error?: string;
 };
 
