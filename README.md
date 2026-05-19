@@ -1,35 +1,30 @@
 # ProjectX
 
-ProjectX is a CLI-first automation repo that manages software-delivery workflow for a separate target application repo.
+ProjectX is a CLI-first automation tool for managing delivery workflow around a separate target application repository.
 
-ProjectX is not the app you are building. It is the control plane.
+It is not the app being built. It is the control plane that:
 
-ProjectX manages:
+- stores target-repo configuration in a local `.env`
+- generates local planning artifacts
+- enforces approval gates before risky steps
+- prepares branches from GitHub issues
+- can create GitHub repos, issues, and pull requests
+- can generate code into the target repo through the OpenAI API
 
-- target repo setup
-- planning artifacts
-- approval-gated workflow steps
-- GitHub issue and PR automation
+## Current State
 
-The target repo contains:
+The codebase currently supports two related workflows:
 
-- application source code
-- tests
-- build config
-- deployment config
+1. A planning workflow driven by a free-form requirement string
+2. A ticket workflow driven by a GitHub issue URL
 
-## Repos And Paths
+The planning workflow is still opinionated and partially hardcoded around the sample work item `theskeleton-google-login`. The generated requirements draft, implementation plan, issue draft, branch name, and PR summary all reflect that proof-of-concept shape today.
 
-ProjectX works with four distinct things:
+This means ProjectX is usable, but it is not yet a general-purpose multi-project orchestrator.
 
-1. The ProjectX GitHub repo
-2. Your local clone of the ProjectX repo
-3. The target app GitHub repo
-4. Your local clone of the target app repo
+## Repository Layout
 
-ProjectX runs from its own local repo, but it operates against the target app repo.
-
-The target app local clone should live outside the ProjectX folder.
+ProjectX should live separately from the target application repo.
 
 Example:
 
@@ -38,63 +33,35 @@ C:\Code\Github\projectx
 C:\Code\Targets\my-app
 ```
 
-## What ProjectX Does Now
-
-ProjectX currently supports:
-
-- interactive target-repo initialization with `init`
-- target repo access validation
-- local target path validation
-- target repo cloning into the configured local path
-- ticket-driven branch preparation from a GitHub issue URL
-- ticket-driven commit, push, and PR creation
-- deterministic requirements draft generation
-- deterministic implementation plan generation
-- deterministic issue draft generation
-- approval-gated workflow progression
-- GitHub repo creation
-- GitHub issue creation
-- implementation branch creation
-- PR summary generation
-- guarded PR creation workflow
-
-ProjectX does not yet fully automate:
-
-- running the target app and completing manual QA end-to-end
+The target repo path must be outside the ProjectX directory. `init` enforces that.
 
 ## Installation
-
-Install dependencies:
 
 ```bash
 npm install
 ```
 
-Run ProjectX in development mode:
+Development entrypoint:
 
 ```bash
-<<<<<<< HEAD
-npm run dev -- <command-or-request>
-=======
-export GITHUB_REPO=my-new-app
->>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
+npm run dev -- <command>
 ```
 
-Build the project:
+Build:
 
 ```bash
-<<<<<<< HEAD
 npm run build
-=======
-npm run dev -- create-repo my-new-app
->>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
-## Environment Variables
+Run built output:
 
-ProjectX stores local configuration in `ProjectX/.env`.
+```bash
+npm start -- <command>
+```
 
-This file is local-only and should not be committed.
+## Environment
+
+ProjectX reads local configuration from `.env` in the repo root.
 
 Common variables:
 
@@ -106,391 +73,227 @@ TARGET_REPO_URL=
 TARGET_REPO_PATH=
 TARGET_BASE_BRANCH=main
 OPENAI_API_KEY=
-OPENAI_MODEL=
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
-## GitHub Token
+Notes:
 
-If the target repo is private, or if you want ProjectX to create issues or pull requests, you need a GitHub personal access token.
-
-Create it from:
-
-1. GitHub
-2. Settings
-3. Developer settings
-4. Personal access tokens
-
-Store it in `ProjectX/.env` like this:
-
-```env
-GITHUB_TOKEN=ghp_your_token_here
-```
-
-For private repos, the token needs repository access. If you want ProjectX to create issues or pull requests later, it also needs the corresponding write permissions.
+- `TARGET_REPO_URL`, `TARGET_REPO_PATH`, and `TARGET_BASE_BRANCH` are required for target-repo operations.
+- `GITHUB_TOKEN` is needed for private repos and GitHub write operations.
+- `OPENAI_API_KEY` is required for `init` to complete and for code generation from ticket flow.
+- `OPENAI_MODEL` defaults to `gpt-4.1-mini`.
 
 ## First-Time Setup
 
-Start with the interactive initializer:
+Use the interactive initializer:
 
 ```bash
-<<<<<<< HEAD
 npm run dev -- init
-=======
-npm run dev -- create-repo my-new-app --description "My app"
-npm run dev -- create-repo my-new-app --public
->>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
 ```
 
-`init` will ask for:
+`init` will:
 
-- target repo URL
-- local target repo path
-- base branch (`main` or `master`)
-- GitHub token if needed
-- OpenAI API key for local code generation
-- whether ProjectX should clone the target repo now
-
-`init` will then:
-
-- check whether the target GitHub repo exists and is accessible
-- check whether the local target path is outside the ProjectX repo
-- detect whether the local target path already contains a git repo
-- save the configuration into `.env`
+- prompt for the target GitHub repo URL
+- prompt for the local target repo path
+- prompt for the base branch (`main` or `master`)
+- optionally capture a GitHub token
+- require an OpenAI API key before finishing setup
 - optionally clone the target repo immediately
+- save resolved settings into `.env`
+- verify GitHub repo accessibility
 
-If the target repo is not accessible, ProjectX will tell you:
-
-- how to create a GitHub token
-- where to save it
-- how to rerun `init`
-
-After the token is set, run this again:
-
-```bash
-<<<<<<< HEAD
-npm run dev -- init
-=======
-git clone https://github.com/salmanalibanani/my-new-app.git
->>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
-```
-
-ProjectX will re-check that the target repo exists and is accessible.
-
-If `OPENAI_API_KEY` is missing, `init` will stop, tell you how to set it in `ProjectX/.env`, and ask you to rerun `npm run dev -- init`.
-
-## Basic Workflow
-
-The intended operator workflow is:
-
-1. Run `init`
-2. Make sure the target repo is accessible
-3. Let `init` clone the target repo now, or run `clone-target` later
-4. Give ProjectX a short requirement
-5. Review the generated planning artifacts
-6. Approve each gated step before moving forward
-7. Prepare the target repo branch from the GitHub issue
-8. Kick off code generation from the GitHub issue
-9. Later, use the guarded PR workflow
-
-You can also start from an existing GitHub issue URL after `init`.
-
-## Give ProjectX A Requirement
-
-Once `init` succeeds and the target repo has been cloned locally, give ProjectX a brief request:
-
-```bash
-npm run dev -- "Add Google login to the target app"
-```
-
-At the current stage, ProjectX turns that request into planning artifacts rather than full target-app implementation.
-
-After that command runs, ProjectX tells you where the generated documents were written.
-Review them under `output/<target-repo-name>/`.
-You can edit those markdown files directly before approving anything.
-
-## Generated Output
-
-ProjectX stores workflow artifacts under:
-
-```text
-output/<target-repo-name>/
-```
-
-Typical layout:
-
-```text
-output/
-<<<<<<< HEAD
-  my-app/
-=======
-  my-new-app/
->>>>>>> 16190a7d9fbe9014d462328c31d4274b86928174
-    issues/
-    requirements/
-    plans/
-    research/
-    verification/
-    pr-summaries/
-    release-notes/
-    logs/
-```
-
-These artifacts belong to ProjectX, not to the target application repo.
-
-## Editing And Approval
-
-ProjectX expects you to review and edit the generated markdown artifacts directly.
-
-Typical operator flow after submitting a brief requirement:
-
-1. Open the generated requirements draft
-2. Edit any sections that need clarification or correction
-3. Save the file
-4. Approve it by changing the status line
-5. Ask ProjectX to create the GitHub issue
-
-To mark the requirements as approved:
-
-1. Open the requirements file under `output/<target-repo-name>/requirements/`
-2. Find the line:
-
-```text
-Status: draft
-```
-
-3. Change it to:
-
-```text
-Status: approved
-```
-
-4. Save the file
-
-ProjectX reads that status line to determine whether later workflow steps are allowed.
-
-After the requirements are approved, create the GitHub issue with:
-
-```bash
-npm run dev -- "<your requirement>" --create-github-issue
-```
-
-When that succeeds, ProjectX will print the GitHub issue URL so you can open the ticket directly.
+If the target repo is private or inaccessible, `init` writes the config anyway and prints remediation steps.
 
 ## Main Commands
 
-### Initialize A Target Repo
+### Initialize configuration
 
 ```bash
 npm run dev -- init
 ```
 
-Use this first.
+### Clone the configured target repo
 
-### Create A New GitHub Repo
+```bash
+npm run dev -- clone-target
+```
+
+This clones the configured target repo into `TARGET_REPO_PATH`, or refreshes it if it already exists locally.
+
+### Create a GitHub repo
 
 ```bash
 npm run dev -- create-repo my-new-app
 ```
 
-Optional:
+Optional flags:
 
 ```bash
-npm run dev -- create-repo my-new-app --description "My new app"
 npm run dev -- create-repo my-new-app --public
+npm run dev -- create-repo my-new-app --description "My new app"
 ```
 
-### Generate Planning Artifacts From A Requirement
+Requires `GITHUB_OWNER` and `GITHUB_TOKEN`.
 
-If you did not clone during `init`, clone the target repo first:
+### Generate planning artifacts from a requirement
 
 ```bash
-npm run dev -- clone-target
+npm run dev -- "Add Google login to the target app"
 ```
 
-Then run a brief requirement:
+With no explicit flags, ProjectX runs the local orchestrator and writes the default planning artifacts:
+
+- requirements draft
+- implementation plan
+- issue draft
+
+You can also run specific stages:
 
 ```bash
-npm run dev -- "Build TheSkeleton app with Google login"
+npm run dev -- "Add Google login to the target app" --generate-requirements
+npm run dev -- "Add Google login to the target app" --create-github-issue
+npm run dev -- "Add Google login to the target app" --generate-implementation-plan
+npm run dev -- "Add Google login to the target app" --prepare-implementation
+npm run dev -- "Add Google login to the target app" --create-implementation-branch
+npm run dev -- "Add Google login to the target app" --generate-pr-summary
+npm run dev -- "Add Google login to the target app" --prepare-pr
+npm run dev -- "Add Google login to the target app" --push-implementation-branch
+npm run dev -- "Add Google login to the target app" --open-pr
+npm run dev -- "Add Google login to the target app" --poc-summary
+npm run dev -- "Add Google login to the target app" --run-all-safe-local
 ```
 
-### Clone The Configured Target Repo
+`--run-all-safe-local` currently runs the safe local artifact steps:
 
-```bash
-npm run dev -- clone-target
-```
+- generate requirements
+- generate implementation plan
+- generate PR summary
+- write POC summary
 
-This command:
-
-- reads `TARGET_REPO_URL`, `TARGET_REPO_PATH`, and `TARGET_BASE_BRANCH`
-- clones the target repo into the configured local path if it is missing
-- if the path already contains the same repo, fetches `origin` and checks out the configured base branch
-- fails safely if the target path contains a different or non-empty non-git directory
-
-### Start From A GitHub Issue URL
+### Prepare a target repo branch from a GitHub issue
 
 ```bash
 npm run dev -- implement-ticket https://github.com/<owner>/<repo>/issues/<number>
 ```
 
-If you omit the URL, ProjectX will ask for it.
-
 This command:
 
-- loads the GitHub issue details
-- verifies that the issue belongs to the configured target repo
-- clones the target repo if needed
-- creates or switches to a new local feature branch for that ticket
-- leaves the branch uncommitted so code can be completed there
+- loads the issue from GitHub
+- verifies it belongs to the configured target repo
+- clones or refreshes the target repo if needed
+- creates or switches to a feature branch derived from the issue number and title
 
-After that, ProjectX tells you:
-
-- the issue URL
-- the branch name
-- the local target repo path
-- the command to run next to kick off code generation
-
-The branch name is generated from the ticket number and issue title, for example:
-
-```text
-feature/issue-123-add-google-login
-```
-
-Local implementation work should stay on that branch until the PR is created.
-
-### Kick Off Code Generation From A GitHub Issue URL
+### Generate code into the target repo from a GitHub issue
 
 ```bash
 npm run dev -- generate-code-from-ticket https://github.com/<owner>/<repo>/issues/<number>
 ```
 
-If you omit the URL, ProjectX will ask for it.
-
 This command:
 
-- verifies that the target repo is cloned locally
-- verifies that the prepared ticket branch exists
-- verifies that the target repo is currently on that branch
-- writes a code-generation preparation log under `output/<target-repo-name>/logs/`
-- calls the OpenAI API to generate local file changes
-- writes those file changes into the prepared branch without committing them
-- prints the changed files and the code-generation log path
+- validates the issue and prepared branch
+- gathers a limited text-only context from the target repo
+- calls the OpenAI Responses API
+- writes returned file contents directly into the target repo
+- writes a code generation log under `output/.../logs/`
 
-After it completes, you should review the local changes and run the target repo's build/tests manually before creating the PR.
+The current implementation skips large files and common generated directories such as `node_modules`, `.git`, `dist`, `build`, and `output`.
 
-### Create A PR From A GitHub Issue URL
+### Commit, push, and open a PR for a ticket branch
 
 ```bash
 npm run dev -- create-ticket-pr https://github.com/<owner>/<repo>/issues/<number>
 ```
 
-If you omit the URL, ProjectX will ask for it.
-
 This command:
 
-- commits all local changes in the target repo branch
-- pushes that branch to GitHub
-- opens a pull request against the configured base branch
-- prints the PR URL
+- commits all current changes in the prepared target repo branch
+- pushes the branch to `origin`
+- opens a GitHub pull request against the configured base branch
 
-If you have switched away from the prepared ticket branch, ProjectX will stop and tell you to switch back before creating the PR.
+## Output Artifacts
 
-### Generate Requirements Draft
+ProjectX writes local artifacts under:
 
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --generate-requirements
+```text
+output/<github-repo>/
 ```
 
-### Create GitHub Issue
+Current directories:
 
-Requirements must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --create-github-issue
+```text
+output/<github-repo>/
+  issues/
+  requirements/
+  plans/
+  research/
+  verification/
+  pr-summaries/
+  release-notes/
+  logs/
 ```
 
-ProjectX will print the issue URL after creation, or tell you if the issue already exists.
+Important current files include:
 
-### Generate Implementation Plan
-
-Requirements must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --generate-implementation-plan
-```
-
-### Prepare Implementation
-
-Implementation plan must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --prepare-implementation
-```
-
-### Create Implementation Branch
-
-Implementation plan must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --create-implementation-branch
-```
-
-### Generate PR Summary
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --generate-pr-summary
-```
-
-### Prepare PR
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --prepare-pr
-```
-
-### Push Implementation Branch
-
-PR summary must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --push-implementation-branch
-```
-
-### Open PR
-
-PR summary must already be approved.
-
-```bash
-npm run dev -- "Build TheSkeleton app with Google login" --open-pr
-```
+- `output/<github-repo>/requirements/theskeleton-google-login.requirements.md`
+- `output/<github-repo>/plans/theskeleton-google-login.implementation-plan.md`
+- `output/<github-repo>/issues/theskeleton-google-login.md`
+- `output/<github-repo>/pr-summaries/theskeleton-google-login.pr-summary.md`
+- `output/<github-repo>/logs/theskeleton-google-login.poc-summary.md`
+- `output/<github-repo>/logs/issue-<number>.code-generation.md`
 
 ## Approval Model
 
-ProjectX is intentionally guarded.
+ProjectX uses markdown status fields as gates.
 
-Current approval gates are:
+Current approval states are read from generated files and use:
 
-- requirements must be approved before GitHub issue creation
-- requirements must be approved before implementation-plan generation
-- implementation plan must be approved before implementation preparation
-- implementation plan must be approved before branch creation
-- PR summary must be approved before branch push
-- PR summary must be approved before PR creation
+```text
+Status: draft
+Status: approved
+```
 
-Approval status is read from the generated markdown artifacts.
+Current enforced gates:
 
-## What To Do Next
+- requirements must be approved before creating a GitHub issue
+- requirements must be approved before generating the implementation plan
+- implementation plan must be approved before creating the implementation branch
+- PR summary must be approved before pushing the implementation branch
+- PR summary must be approved before opening a pull request
 
-If you are using ProjectX for the first time:
+## Practical Workflow
+
+For the planning flow:
 
 1. Run `npm run dev -- init`
-2. Fix any GitHub access issue
-3. Rerun `npm run dev -- init` until access succeeds
-4. Let `init` clone the target repo, or run `npm run dev -- clone-target`
-5. Submit a short requirement with `npm run dev -- "<your requirement>"`
-6. Review the generated files under `output/`
+2. Run `npm run dev -- "<your requirement>"`
+3. Review the generated files in `output/<github-repo>/`
+4. Change status lines from `draft` to `approved` where required
+5. Run the next gated command
 
-## Notes
+For the ticket flow:
 
-- ProjectX runs from its own repo, but the target repo is the execution target.
-- The target repo local path should not be inside the ProjectX folder.
-- `ProjectX/.env` is local-only and should remain uncommitted.
-- ProjectX changes are currently made directly on `main`.
+1. Run `npm run dev -- init`
+2. Run `npm run dev -- implement-ticket <issue-url>`
+3. Run `npm run dev -- generate-code-from-ticket <issue-url>`
+4. Review and test changes in the target repo manually
+5. Run `npm run dev -- create-ticket-pr <issue-url>`
+
+## Limitations
+
+The current codebase has several important constraints:
+
+- planning artifacts are not fully dynamic and still describe the hardcoded TheSkeleton Google login work item
+- the implementation branch used by the planning workflow is fixed to `feature/theskeleton-google-login`
+- PR summary generation expects an app verification artifact to exist, but there is no completed app verification flow in this repo yet
+- `--prepare-implementation` and `--prepare-pr` report readiness only; they do not perform external actions
+- target-repo testing and QA are still manual
+
+## Source
+
+Main entrypoints live in:
+
+- [src/index.ts](/c:/Code/Github/projectx/src/index.ts)
+- [src/init.ts](/c:/Code/Github/projectx/src/init.ts)
+- [src/orchestrator.ts](/c:/Code/Github/projectx/src/orchestrator.ts)
+- [src/codeGenerator.ts](/c:/Code/Github/projectx/src/codeGenerator.ts)
